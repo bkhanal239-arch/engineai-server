@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./vector_db:/app/vector_db
+    env_file:
+      - .env
+    restart: unless-stopped

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EngineAI — Engineering Code Assistant</title>
+  <style>
+    :root {
+      --bg:       #0a0c14;
+      --surface:  #111320;
+      --border:   #1e2235;
+      --accent:   #4f8ef7;
+      --accent2:  #a259ff;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --user-bg:  #1a2340;
+      --agent-bg: #111827;
+      --success:  #22c55e;
+      --danger:   #ef4444;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,12,20,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+    }
+
+    .nav-brand .icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+    }
+
+    .nav-badge {
+      font-size: 11px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 64px 24px 48px;
+      background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(79,142,247,0.08) 0%, transparent 70%);
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--accent);
+      border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 20px;
+      padding: 4px 14px;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label { font-size: 12px; color: var(--muted); }
+
+    /* ── MAIN LAYOUT ── */
+    .app {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 0;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 24px 40px;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      padding: 0 20px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      padding: 0 4px;
+      margin-bottom: 4px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    /* PDF list */
+    .pdf-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+
+    .pdf-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 9px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+
+    .pdf-item:hover { background: rgba(79,142,247,0.06); color: var(--text); }
+
+    .pdf-item.active {
+      background: rgba(79,142,247,0.1);
+      border-color: rgba(79,142,247,0.25);
+      color: var(--text);
+    }
+
+    .pdf-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .pdf-item[data-value="all"] .pdf-dot { background: var(--accent2); }
+
+    .pdf-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Upload */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: rgba(79,142,247,0.04);
+    }
+
+    .upload-zone input { display: none; }
+    .upload-icon { font-size: 24px; margin-bottom: 8px; }
+    .upload-zone p { font-size: 13px; color: var(--muted); }
+    .upload-zone span { font-size: 11px; color: var(--muted); margin-top: 4px; display: block; }
+
+    #upload-status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      min-height: 16px;
+    }
+
+    #upload-status.ok  { color: var(--success); }
+    #upload-status.err { color: var(--danger); }
+
+    /* ── CHAT ── */
+    .chat-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header h2 { font-size: 15px; font-weight: 600; }
+    .chat-header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    #scope-tag {
+      font-size: 12px;
+      background: rgba(79,142,247,0.1);
+      border: 1px solid rgba(79,142,247,0.2);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* messages */
+    #messages {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      min-height: 420px;
+      max-height: 500px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      gap: 12px;
+      padding: 40px 0;
+    }
+
+    .empty-icon { font-size: 48px; filter: grayscale(0.3); }
+    .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); }
+    .empty-state p  { font-size: 13px; text-align: center; max-width: 300px; line-height: 1.6; }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .suggestion {
+      font-size: 12px;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      color: var(--muted);
+    }
+
+    .suggestion:hover {
+      background: rgba(79,142,247,0.08);
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    /* message bubbles */
+    .msg { display: flex; flex-direction: column; gap: 8px; max-width: 88%; }
+    .msg.user  { align-self: flex-end; align-items: flex-end; }
+    .msg.agent { align-self: flex-start; }
+
+    .msg-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .msg-avatar {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+    }
+
+    .msg.user  .msg-avatar { background: var(--user-bg); }
+    .msg.agent .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+
+    .bubble {
+      padding: 13px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+
+    .msg.user  .bubble { background: var(--user-bg);  border-bottom-right-radius: 4px; }
+    .msg.agent .bubble { background: var(--agent-bg); border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+
+    /* snippets */
+    .snippets-toggle {
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .snippets-toggle:hover { text-decoration: underline; }
+
+    .snippets { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+    .snippet {
+      background: rgba(10,12,20,0.6);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .snippet-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .snippet-page {
+      background: rgba(79,142,247,0.15);
+      color: var(--accent);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+    }
+
+    /* typing */
+    .typing-bubble {
+      background: var(--agent-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      border-bottom-left-radius: 4px;
+      padding: 14px 18px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      width: fit-content;
+    }
+
+    .typing-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
+    /* input */
+    .input-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 12px 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .input-area:focus-within { border-color: rgba(79,142,247,0.5); }
+
+    #question {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      resize: none;
+      height: 24px;
+      max-height: 120px;
+      font-family: inherit;
+    }
+
+    #question::placeholder { color: var(--muted); }
+
+    #send-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 10px;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: opacity 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    #send-btn:hover   { opacity: 0.85; transform: scale(1.03); }
+    #send-btn:active  { transform: scale(0.97); }
+    #send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .app { grid-template-columns: 1fr; padding: 0 12px 32px; }
+      .sidebar { padding: 0; }
+      .hero { padding: 40px 16px 32px; }
+      .hero-stats { gap: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="icon">⚙️</div>
+    EngineAI
+  </div>
+  <span class="nav-badge">Beta</span>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">⚡ Powered by Gemini AI</div>
+  <h1>Your Engineering Codes,<br/><span>Instantly Searchable</span></h1>
+  <p>Ask questions across ACI 318, ACI 350, ASCE 7 and more — get precise answers with page references in seconds.</p>
+  <div class="hero-stats">
+    <div class="stat">
+      <span class="stat-value" id="stat-docs">—</span>
+      <span class="stat-label">Documents</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">AI</span>
+      <span class="stat-label">Powered Search</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">100%</span>
+      <span class="stat-label">Local Vector DB</span>
+    </div>
+  </div>
+</section>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="sidebar-title">Documents</div>
+      <ul class="pdf-list" id="pdf-list">
+        <li class="pdf-item active" data-value="all">
+          <span class="pdf-dot" style="background:var(--accent2)"></span>
+          <span class="pdf-name">All Documents</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat-wrap">
+
+    <div class="chat-header">
+      <div>
+        <h2>Ask your documents</h2>
+        <p>Searching across your engineering code library</p>
+      </div>
+      <span id="scope-tag">All Documents</span>
+    </div>
+
+    <div id="messages">
+      <div class="empty-state">
+        <div class="empty-icon">📐</div>
+        <h3>Ask anything</h3>
+        <p>Get answers from your engineering codes with exact page references</p>
+        <div class="suggestions">
+          <span class="suggestion" onclick="prefill(this)">Minimum slab thickness ACI 318</span>
+          <span class="suggestion" onclick="prefill(this)">Wind load ASCE 7</span>
+          <span class="suggestion" onclick="prefill(this)">Crack width limits ACI 350</span>
+          <span class="suggestion" onclick="prefill(this)">Load combinations</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="question" rows="1" placeholder="Ask a question about your engineering codes…"></textarea>
+      <button id="send-btn" title="Send">➤</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  EngineAI &mdash; Private engineering knowledge base &bull; Powered by Gemini &amp; ChromaDB
+</footer>
+
+<script>
+  let selectedPdf = null;
+
+  // ── Load PDFs ──
+  async function loadPdfs() {
+    try {
+      const res  = await fetch('/pdfs');
+      const data = await res.json();
+      const list = document.getElementById('pdf-list');
+      document.getElementById('stat-docs').textContent = data.pdfs.length;
+
+      data.pdfs.forEach(pdf => {
+        const li = document.createElement('li');
+        li.className = 'pdf-item';
+        li.dataset.value = pdf;
+        const shortName = pdf.length > 30 ? pdf.slice(0, 30) + '…' : pdf;
+        li.innerHTML = `<span class="pdf-dot"></span><span class="pdf-name" title="${pdf}">${shortName}</span>`;
+        li.onclick = () => selectPdf(pdf, li);
+        list.appendChild(li);
+      });
+    } catch(e) {
+      document.getElementById('stat-docs').textContent = '?';
+    }
+  }
+
+  function selectPdf(pdf, el) {
+    document.querySelectorAll('.pdf-item').forEach(l => l.classList.remove('active'));
+    el.classList.add('active');
+    selectedPdf = (pdf === 'all') ? null : pdf;
+    document.getElementById('scope-tag').textContent = selectedPdf || 'All Documents';
+  }
+
+  document.querySelector('[data-value="all"]').onclick = function() { selectPdf('all', this); };
+
+  // ── Suggestions ──
+  function prefill(el) {
+    document.getElementById('question').value = el.textContent;
+    document.getElementById('question').focus();
+  }
+
+  // ── Messages ──
+  function clearEmpty() {
+    const empty = document.querySelector('.empty-state');
+    if (empty) empty.remove();
+  }
+
+  function addMsg(role, text, snippets = [], rawSnippets = []) {
+    clearEmpty();
+    const box = document.getElementById('messages');
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${role}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.innerHTML = role === 'user'
+      ? `<span>You</span><div class="msg-avatar">👤</div>`
+      : `<div class="msg-avatar">⚙</div><span>EngineAI</span>`;
+    wrap.appendChild(meta);
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+
+    if (role === 'agent' && rawSnippets.length) {
+      const btn = document.createElement('button');
+      btn.className = 'snippets-toggle';
+      btn.textContent = `▸ View ${rawSnippets.length} source snippet(s)`;
+      let open = false;
+      const snipBox = document.createElement('div');
+      snipBox.className = 'snippets';
+      snipBox.style.display = 'none';
+
+      rawSnippets.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'snippet';
+        div.innerHTML = `
+          <div class="snippet-header">
+            📄 ${s.source}
+            <span class="snippet-page">Page ${s.page}</span>
+          </div>
+          ${s.text}…`;
+        snipBox.appendChild(div);
+      });
+
+      btn.onclick = () => {
+        open = !open;
+        snipBox.style.display = open ? 'flex' : 'none';
+        btn.textContent = open
+          ? `▾ Hide snippets`
+          : `▸ View ${rawSnippets.length} source snippet(s)`;
+      };
+
+      wrap.appendChild(btn);
+      wrap.appendChild(snipBox);
+    }
+
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function addTyping() {
+    clearEmpty();
+    const box = document.getElementById('messages');
+    const wrap = document.createElement('div');
+    wrap.className = 'msg agent';
+    wrap.id = 'typing-indicator';
+    wrap.innerHTML = `
+      <div class="msg-meta"><div class="msg-avatar">⚙</div><span>EngineAI</span></div>
+      <div class="typing-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>`;
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typing-indicator');
+    if (t) t.remove();
+  }
+
+  // ── Send ──
+  async function send() {
+    const input = document.getElementById('question');
+    const btn   = document.getElementById('send-btn');
+    const q = input.value.trim();
+    if (!q) return;
+
+    addMsg('user', q);
+    input.value = '';
+    input.style.height = '24px';
+    btn.disabled = true;
+    addTyping();
+
+    try {
+      const res  = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, pdf_name: selectedPdf })
+      });
+      const data = await res.json();
+      removeTyping();
+      addMsg('agent', res.ok ? data.answer : '✗ ' + data.detail, [], res.ok ? (data.snippets || []) : []);
+    } catch {
+      removeTyping();
+      addMsg('agent', '✗ Could not reach the server. Is it running?');
+    }
+
+    btn.disabled = false;
+    input.focus();
+  }
+
+  document.getElementById('send-btn').onclick = send;
+
+  // auto-resize textarea + Enter to send
+  const ta = document.getElementById('question');
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  ta.addEventListener('input', () => {
+    ta.style.height = '24px';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+
+  loadPdfs();
+</script>
+</body>
+</html>
