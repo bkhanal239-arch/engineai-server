@@ -42,24 +42,30 @@ def get_ingested_pdfs():
 
 
 def expand_query(question: str) -> str:
-    """Reformulate a vague or incomplete question into a precise engineering code query."""
+    """Reformulate a vague or incomplete question into a precise engineering code query.
+    Falls back to the original question if Gemini is unavailable."""
+    import time
     from langchain_core.messages import HumanMessage, SystemMessage
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-    messages = [
-        SystemMessage(content=(
-            "You are a structural engineering expert. Your only job is to rewrite the user's question "
-            "into a complete, precise structural engineering code question that can be used to search "
-            "technical PDF documents like ACI 318, ACI 350, ASCE 7, IBC, etc.\n"
-            "Rules:\n"
-            "- If the question is vague (e.g. 'flood' or 'slab'), expand it to the most likely full engineering question.\n"
-            "- If it is already specific and complete, return it unchanged.\n"
-            "- Output ONLY the reformulated question — no explanation, no prefix, no quotes."
-        )),
-        HumanMessage(content=question)
-    ]
-    result = llm.invoke(messages)
-    expanded = result.content.strip().strip('"').strip("'")
-    return expanded if expanded else question
+    system = (
+        "You are a structural engineering expert. Your only job is to rewrite the user's question "
+        "into a complete, precise structural engineering code question that can be used to search "
+        "technical PDF documents like ACI 318, ACI 350, ASCE 7, IBC, etc.\n"
+        "Rules:\n"
+        "- If the question is vague (e.g. 'flood' or 'slab'), expand it to the most likely full engineering question.\n"
+        "- If it is already specific and complete, return it unchanged.\n"
+        "- Output ONLY the reformulated question — no explanation, no prefix, no quotes."
+    )
+    for attempt in range(3):
+        try:
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+            result = llm.invoke([SystemMessage(content=system), HumanMessage(content=question)])
+            expanded = result.content.strip().strip('"').strip("'")
+            return expanded if expanded else question
+        except Exception:
+            if attempt < 2:
+                time.sleep(2 ** attempt)   # 1 s, then 2 s
+            else:
+                return question            # fall back to original on repeated failure
 
 
 def format_context(docs):

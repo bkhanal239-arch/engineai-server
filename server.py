@@ -1,4 +1,5 @@
 import os
+import time
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -66,7 +67,17 @@ def ask(request: AskRequest):
         raise HTTPException(status_code=404, detail=label)
 
     try:
-        raw = chain.invoke(expanded)
+        # Retry main chain up to 3 times on transient Gemini 503 errors
+        raw = None
+        for attempt in range(3):
+            try:
+                raw = chain.invoke(expanded)
+                break
+            except Exception as e:
+                if attempt < 2 and ("503" in str(e) or "UNAVAILABLE" in str(e) or "429" in str(e)):
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
         parsed = parse_response(raw)
 
         docs = retriever.invoke(expanded)
@@ -89,7 +100,12 @@ def ask(request: AskRequest):
             "raw_chunks":   raw_snippets,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        msg = str(e)
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise HTTPException(status_code=503, detail="Gemini is temporarily overloaded. Please try again in a few seconds.")
+        if "429" in msg or "quota" in msg.lower():
+            raise HTTPException(status_code=429, detail="API rate limit reached. Please wait a moment and try again.")
+        raise HTTPException(status_code=500, detail=msg)
 
 
 @app.post("/chat")
