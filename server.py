@@ -123,18 +123,35 @@ def find_pdf(name: str) -> str | None:
     return None
 
 
-@app.get("/page-image")
-def page_image(pdf: str = Query(...), page: int = Query(...)):
+@app.get("/page-count")
+def page_count(pdf: str = Query(...)):
     import fitz
     found = find_pdf(pdf)
     if not found:
         raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
     doc = fitz.open(found)
+    n = len(doc)
+    doc.close()
+    return {"count": n}
+
+
+@app.get("/page-image")
+def page_image(pdf: str = Query(...), page: int = Query(...), scale: float = Query(1.5)):
+    import fitz
+    scale = max(0.5, min(3.0, scale))
+    found = find_pdf(pdf)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
+    doc = fitz.open(found)
     page_idx = max(0, min(page - 1, len(doc) - 1))
-    pix = doc[page_idx].get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+    pix = doc[page_idx].get_pixmap(matrix=fitz.Matrix(scale, scale))
     img_bytes = pix.tobytes("png")
     doc.close()
-    return Response(content=img_bytes, media_type="image/png")
+    return Response(
+        content=img_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
 
 
 @app.get("/pdf-file")

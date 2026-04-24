@@ -6,13 +6,6 @@
   <title>EngineAI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    if (typeof pdfjsLib !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-  </script>
   <style>
     :root {
       --sidebar-w: 210px;
@@ -566,10 +559,16 @@
       align-items: center; padding: 16px 0; gap: 10px;
     }
 
-    .pdf-viewer-scroll::-webkit-scrollbar { width: 8px; }
-    .pdf-viewer-scroll::-webkit-scrollbar-track { background: #3a3d40; }
-    .pdf-viewer-scroll::-webkit-scrollbar-thumb { background: #686b6e; border-radius: 4px; }
-    .pdf-viewer-scroll::-webkit-scrollbar-thumb:hover { background: #888; }
+    .pdf-viewer-scroll::-webkit-scrollbar { width: 6px; }
+    .pdf-viewer-scroll::-webkit-scrollbar-track { background: transparent; }
+    .pdf-viewer-scroll::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #0078d4 0%, #7c3aed 100%);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .pdf-viewer-scroll::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #1a8fe0 0%, #9058f0 100%);
+    }
 
     .pdf-page-wrapper {
       position: relative;
@@ -751,15 +750,11 @@
   let askMode      = 'chat';
 
   // PDF viewer state
-  let pdfDoc        = null;
-  let pdfTotalPages = 0;
-  let pdfPageWidth  = 0;
-  let pdfPageHeight = 0;
-  let pdfScale      = 1.5;
+  let pdfTotalPages  = 0;
+  let pdfScale       = 1.5;
   let pdfCurrentPage = 1;
   let pdfLoadedName  = null;
   let pageObserver   = null;
-  let renderQueue    = new Set();
 
   // ── Mode switching ──
   function setMode(mode) {
@@ -1124,79 +1119,80 @@
     });
   }
 
-  // ── PDF VIEWER ──
+  // ── PDF VIEWER (image-based, no PDF.js) ──
   async function loadPdfIntoViewer(pdfName) {
     if (pdfName === pdfLoadedName) return;
     pdfLoadedName = pdfName;
 
     const scroll = document.getElementById('pdf-viewer-scroll');
-
-    // Show loading state
-    scroll.innerHTML = `<div class="pdf-loading-state">
-      <div class="thinking-dots" style="scale:1.5"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>
-      Loading PDF…
-    </div>`;
     document.getElementById('pdf-toolbar-title').textContent = pdfName;
     document.getElementById('pdf-current-page').textContent = '—';
     document.getElementById('pdf-total-pages').textContent  = '—';
-
-    // Disconnect old observer
-    if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
-    renderQueue.clear();
-
-    if (typeof pdfjsLib === 'undefined') {
-      scroll.innerHTML = `<div class="pdf-loading-state" style="color:#f88">PDF.js failed to load. Check internet connection.</div>`;
-      return;
-    }
-
-    try {
-      pdfDoc = await pdfjsLib.getDocument({
-        url: '/pdf-file?pdf=' + encodeURIComponent(pdfName),
-        rangeChunkSize: 65536,
-        disableAutoFetch: true,
-        disableStream: false,
-      }).promise;
-    } catch (e) {
-      scroll.innerHTML = `<div class="pdf-loading-state" style="color:#f88">⚠ Could not load PDF: ${esc(String(e.message || e))}</div>`;
-      pdfLoadedName = null;
-      return;
-    }
-
-    pdfTotalPages = pdfDoc.numPages;
-    document.getElementById('pdf-total-pages').textContent  = pdfTotalPages;
-    document.getElementById('pdf-current-page').textContent = 1;
     document.getElementById('pdf-zoom-label').textContent   = Math.round(pdfScale * 100) + '%';
 
-    // Measure page 1 dimensions
-    const page1 = await pdfDoc.getPage(1);
-    const vp1   = page1.getViewport({ scale: pdfScale });
-    pdfPageWidth  = vp1.width;
-    pdfPageHeight = vp1.height;
+    if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
 
-    // Build placeholder divs
+    // Show page 1 immediately while fetching count
     scroll.innerHTML = '';
-    for (let p = 1; p <= pdfTotalPages; p++) {
-      const wrapper = makePlaceholder(p);
-      scroll.appendChild(wrapper);
-    }
+    const firstWrapper = makePageWrapper(1);
+    scroll.appendChild(firstWrapper);
+    loadPageImage(firstWrapper, 1, pdfName);
 
-    // Set up intersection observer
-    setupPageObserver();
+    // Fetch total page count
+    try {
+      const res = await fetch('/page-count?pdf=' + encodeURIComponent(pdfName));
+      if (!res.ok) throw new Error('not found');
+      const { count } = await res.json();
+      pdfTotalPages = count;
+      document.getElementById('pdf-total-pages').textContent = count;
+      document.getElementById('pdf-current-page').textContent = 1;
+
+      // Build remaining placeholders
+      for (let p = 2; p <= pdfTotalPages; p++) {
+        scroll.appendChild(makePageWrapper(p));
+      }
+      setupPageObserver();
+    } catch {
+      document.getElementById('pdf-total-pages').textContent = '?';
+    }
   }
 
-  function makePlaceholder(pageNum) {
+  function makePageWrapper(pageNum) {
     const wrapper = document.createElement('div');
     wrapper.className = 'pdf-page-wrapper placeholder';
     wrapper.dataset.page = pageNum;
-    wrapper.style.width  = pdfPageWidth  + 'px';
-    wrapper.style.height = pdfPageHeight + 'px';
-
+    wrapper.style.minHeight = '400px';
     const label = document.createElement('div');
     label.className = 'pdf-page-num';
     label.textContent = pageNum;
     wrapper.appendChild(label);
-
     return wrapper;
+  }
+
+  function loadPageImage(wrapper, pageNum, pdfName) {
+    if (!wrapper.classList.contains('placeholder')) return;
+    const name = pdfName || pdfLoadedName;
+    if (!name) return;
+    const img = new Image();
+    img.style.display = 'block';
+    img.alt = 'Page ' + pageNum;
+    img.onload = () => {
+      wrapper.classList.remove('placeholder');
+      wrapper.style.minHeight = '';
+      wrapper.innerHTML = '';
+      wrapper.style.width = img.naturalWidth + 'px';
+      wrapper.style.height = img.naturalHeight + 'px';
+      wrapper.appendChild(img);
+      const label = document.createElement('div');
+      label.className = 'pdf-page-num';
+      label.textContent = pageNum;
+      wrapper.appendChild(label);
+    };
+    img.onerror = () => {
+      wrapper.innerHTML = `<div style="color:#999;font-size:11px;padding:20px;text-align:center">Page ${pageNum} unavailable</div>`;
+      wrapper.classList.remove('placeholder');
+    };
+    img.src = `/page-image?pdf=${encodeURIComponent(name)}&page=${pageNum}&scale=${pdfScale}`;
   }
 
   function setupPageObserver() {
@@ -1205,76 +1201,28 @@
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
         const wrapper = entry.target;
-        const page    = parseInt(wrapper.dataset.page);
-
-        // Update page counter
+        const page = parseInt(wrapper.dataset.page);
         pdfCurrentPage = page;
         document.getElementById('pdf-current-page').textContent = page;
-
-        // Render this page + ±2 buffer
-        for (let p = Math.max(1, page - 2); p <= Math.min(pdfTotalPages, page + 2); p++) {
+        // Load this page + 1 ahead
+        for (let p = page; p <= Math.min(pdfTotalPages, page + 1); p++) {
           const w = scroll.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
-          if (w && w.classList.contains('placeholder') && !renderQueue.has(p)) {
-            renderPage(p, w);
-          }
+          if (w && w.classList.contains('placeholder')) loadPageImage(w, p);
         }
       });
-    }, { root: scroll, threshold: 0.1 });
+    }, { root: scroll, threshold: 0.05 });
 
     scroll.querySelectorAll('.pdf-page-wrapper').forEach(w => pageObserver.observe(w));
   }
 
-  async function renderPage(pageNum, wrapper) {
-    if (renderQueue.has(pageNum)) return;
-    renderQueue.add(pageNum);
-
-    try {
-      const page     = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: pdfScale });
-
-      const canvas = document.createElement('canvas');
-      canvas.width  = viewport.width;
-      canvas.height = viewport.height;
-
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // Update wrapper to actual rendered size
-      wrapper.style.width  = viewport.width  + 'px';
-      wrapper.style.height = viewport.height + 'px';
-      wrapper.classList.remove('placeholder');
-      wrapper.innerHTML = '';
-      wrapper.appendChild(canvas);
-
-      const label = document.createElement('div');
-      label.className   = 'pdf-page-num';
-      label.textContent = pageNum;
-      wrapper.appendChild(label);
-
-    } catch (e) {
-      wrapper.innerHTML = `<div style="color:#999;font-size:11px;padding:10px">Page ${pageNum} error</div>`;
-    }
-
-    renderQueue.delete(pageNum);
-  }
-
-  // Scroll PDF to a specific page (called by page-ref-link clicks)
   function scrollToPdfPage(pageNum) {
-    if (!pdfDoc) return;
+    if (!pdfLoadedName) return;
     if (currentMode === 'chat') setMode('split');
-
     const scroll  = document.getElementById('pdf-viewer-scroll');
     const wrapper = scroll.querySelector(`.pdf-page-wrapper[data-page="${pageNum}"]`);
     if (!wrapper) return;
-
     wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Render immediately if still a placeholder
-    if (wrapper.classList.contains('placeholder')) {
-      renderPage(pageNum, wrapper);
-    }
-
-    // Highlight flash
+    if (wrapper.classList.contains('placeholder')) loadPageImage(wrapper, pageNum);
     wrapper.classList.add('page-highlight');
     setTimeout(() => wrapper.classList.remove('page-highlight'), 1800);
   }
@@ -1286,32 +1234,22 @@
   function pdfZoomIn()  { setPdfScale(Math.min(3.0, pdfScale + 0.25)); }
   function pdfZoomOut() { setPdfScale(Math.max(0.5, pdfScale - 0.25)); }
 
-  async function setPdfScale(newScale) {
-    if (!pdfDoc) return;
+  function setPdfScale(newScale) {
+    if (!pdfLoadedName) return;
     pdfScale = newScale;
     document.getElementById('pdf-zoom-label').textContent = Math.round(pdfScale * 100) + '%';
-
-    // Re-measure from page 1
-    const page1 = await pdfDoc.getPage(1);
-    const vp1   = page1.getViewport({ scale: pdfScale });
-    pdfPageWidth  = vp1.width;
-    pdfPageHeight = vp1.height;
-
-    // Reset all wrappers to placeholder at new size
-    renderQueue.clear();
+    // Re-render all loaded pages at new scale
     const scroll = document.getElementById('pdf-viewer-scroll');
     scroll.querySelectorAll('.pdf-page-wrapper').forEach(w => {
       const p = parseInt(w.dataset.page);
       w.classList.add('placeholder');
-      w.style.width  = pdfPageWidth  + 'px';
-      w.style.height = pdfPageHeight + 'px';
+      w.style.width = ''; w.style.height = '';
       w.innerHTML = '';
       const label = document.createElement('div');
-      label.className = 'pdf-page-num';
-      label.textContent = p;
+      label.className = 'pdf-page-num'; label.textContent = p;
       w.appendChild(label);
     });
-    // Observer fires immediately for visible pages → re-renders them
+    // Observer re-fires for visible pages
   }
 
   // ── Helpers ──
