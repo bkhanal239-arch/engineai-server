@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -9,8 +10,20 @@ from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
 load_dotenv()
 
-DB_DIR = "vector_db"
+DB_DIR = os.environ.get(
+    "VECTOR_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "vector_db")
+)
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+PROMPT_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "prompt_template.md")
+
+
+def load_system_prompt():
+    try:
+        with open(PROMPT_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
 
 
 def get_embeddings():
@@ -28,13 +41,36 @@ def get_ingested_pdfs():
     return [name for name in os.listdir(DB_DIR) if os.path.isdir(os.path.join(DB_DIR, name))]
 
 
-def format_docs_with_snippets(docs):
+def format_context(docs):
     parts = []
-    for doc in docs:
+    for i, doc in enumerate(docs, 1):
         source = os.path.basename(doc.metadata.get("source", "unknown"))
-        page = doc.metadata.get("page", "?")
-        parts.append(f"[{source} | Page {page + 1}]\n{doc.page_content}")
-    return "\n\n".join(parts)
+        page = doc.metadata.get("page", 0)
+        parts.append(
+            f"[Chunk {i} | Source: {source} | Page: {page + 1}]\n"
+            f"{doc.page_content.strip()}"
+        )
+    return "\n\n---\n\n".join(parts)
+
+
+def parse_response(raw: str) -> dict:
+    def extract(label):
+        pattern = rf"\*\*{label}:\*\*\s*(.*?)(?=\n\n\*\*|\Z)"
+        m = re.search(pattern, raw, re.DOTALL | re.IGNORECASE)
+        return m.group(1).strip().strip('"').strip("'") if m else ""
+
+    answer    = extract("Answer")
+    code_ref  = extract("Code Reference")
+    snippet   = extract("Exact Snippet")
+
+    if not answer:
+        answer = raw.strip()
+
+    return {
+        "answer":    answer,
+        "code_ref":  code_ref,
+        "snippet":   snippet,
+    }
 
 
 def build_retriever(pdf_name=None):
@@ -46,7 +82,7 @@ def build_retriever(pdf_name=None):
         if not os.path.exists(db_path):
             return None, f"No database found for '{pdf_name}'."
         vector_db = Chroma(persist_directory=db_path, embedding_function=embeddings)
-        return vector_db.as_retriever(search_kwargs={"k": 4}), pdf_name
+        return vector_db.as_retriever(search_kwargs={"k": 5}), pdf_name
 
     ingested = get_ingested_pdfs()
     if not ingested:
@@ -69,18 +105,26 @@ def build_chain(pdf_name=None):
     if retriever is None:
         return None, None, label
 
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+    system_prompt = load_system_prompt()
 
-    prompt = PromptTemplate.from_template(
-        "Use the following context from the documents to answer the question.\n"
-        "If the answer is not in the context, say 'I don't have that information in the provided documents.'\n\n"
-        "Context:\n{context}\n\n"
-        "Question: {question}\n\n"
-        "Answer:"
+    prompt_text = (
+        system_prompt
+        + "\n\n---\nRETRIEVED CONTEXT:\n{context}"
+        + "\n\n---\nUSER QUESTION:\n{question}"
+        + "\n\nRespond using the exact format specified above."
     )
 
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0,
+        top_p=1,
+        max_output_tokens=1024,
+    )
+
+    prompt = PromptTemplate.from_template(prompt_text)
+
     chain = (
-        {"context": retriever | format_docs_with_snippets, "question": RunnablePassthrough()}
+        {"context": retriever | format_context, "question": RunnablePassthrough()}
         | prompt
         | llm
         | StrOutputParser()

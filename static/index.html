@@ -3,730 +3,1036 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EngineAI — Engineering Code Assistant</title>
+  <title>EngineAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
   <style>
     :root {
-      --bg:       #0a0c14;
-      --surface:  #111320;
-      --border:   #1e2235;
-      --accent:   #4f8ef7;
-      --accent2:  #a259ff;
-      --text:     #e2e8f0;
-      --muted:    #64748b;
-      --user-bg:  #1a2340;
-      --agent-bg: #111827;
-      --success:  #22c55e;
-      --danger:   #ef4444;
+      --sidebar-w: 210px;
+      --divider-w: 6px;
+      --bg:        #f3f3f3;
+      --sidebar:   #ffffff;
+      --surface:   #ffffff;
+      --surface2:  #f5f5f5;
+      --border:    #e4e4e4;
+      --border2:   #d0d0d0;
+      --accent:    #0078d4;
+      --accent-bg: #e8f4fd;
+      --accent2:   #7c3aed;
+      --text:      #1a1a1a;
+      --sub:       #666;
+      --muted:     #aaa;
+      --green:     #107c10;
+      --green-bg:  #f0faf0;
+      --yellow:    #7d5200;
+      --yellow-bg: #fffbeb;
+      --orange:    #8b3a0f;
+      --orange-bg: #fff7f3;
+      --hl:        #fff176;
+      --shadow:    0 1px 4px rgba(0,0,0,0.07), 0 2px 10px rgba(0,0,0,0.04);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
 
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
       display: flex;
-      flex-direction: column;
+      height: 100vh;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── NAV ── */
-    nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(10,12,20,0.85);
-      backdrop-filter: blur(12px);
+    /* ══════════════════════════════
+       SIDEBAR
+    ══════════════════════════════ */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .brand {
+      padding: 13px 14px 10px;
+      display: flex; align-items: center; gap: 9px;
       border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-shrink: 0;
     }
 
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 18px;
-      letter-spacing: -0.3px;
-    }
-
-    .nav-brand .icon {
-      width: 34px; height: 34px;
+    .brand-logo {
+      width: 28px; height: 28px;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 8px;
+      border-radius: 7px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px;
+      font-size: 14px; flex-shrink: 0;
     }
 
-    .nav-badge {
-      font-size: 11px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-weight: 600;
-      letter-spacing: 0.3px;
+    .brand-name { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
+    .brand-tag  {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.7px;
+      text-transform: uppercase; color: var(--accent);
+      background: var(--accent-bg);
+      border: 1px solid rgba(0,120,212,0.2);
+      padding: 1px 5px; border-radius: 3px;
     }
 
-    /* ── HERO ── */
-    .hero {
-      text-align: center;
-      padding: 64px 24px 48px;
-      background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(79,142,247,0.08) 0%, transparent 70%);
+    .new-btn {
+      margin: 9px 10px 5px;
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 11px; border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--text); font-size: 12px; font-family: inherit;
+      font-weight: 500; cursor: pointer; transition: all 0.15s;
     }
 
-    .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--accent);
-      border: 1px solid rgba(79,142,247,0.3);
-      border-radius: 20px;
-      padding: 4px 14px;
-      margin-bottom: 20px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      font-weight: 600;
+    .new-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    .search-wrap { padding: 3px 10px 5px; }
+
+    .search-wrap input {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 5px;
+      padding: 5px 10px 5px 26px; font-size: 12px;
+      font-family: inherit; color: var(--text); outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: 7px center;
     }
 
-    .hero h1 {
-      font-size: clamp(28px, 5vw, 48px);
-      font-weight: 800;
-      letter-spacing: -1px;
-      line-height: 1.15;
-      margin-bottom: 16px;
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--muted); }
+
+    .sidebar-content { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+    .sidebar-content::-webkit-scrollbar { width: 3px; }
+    .sidebar-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    .sec-label {
+      padding: 9px 14px 3px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
     }
 
-    .hero h1 span {
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+    .doc-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px 6px 14px;
+      cursor: pointer; color: var(--sub); font-size: 12px;
+      border-left: 3px solid transparent; transition: all 0.12s;
     }
 
-    .hero p {
-      font-size: 16px;
-      color: var(--muted);
-      max-width: 480px;
-      margin: 0 auto 32px;
-      line-height: 1.6;
+    .doc-item:hover { background: var(--surface2); color: var(--text); }
+    .doc-item.active { background: var(--accent-bg); border-left-color: var(--accent); color: var(--accent); font-weight: 500; }
+    .doc-item .di { font-size: 12px; flex-shrink: 0; }
+    .doc-item .dn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+
+    .recent-item {
+      display: flex; align-items: flex-start; gap: 6px;
+      padding: 5px 10px 5px 14px;
+      cursor: pointer; color: var(--sub); font-size: 11.5px;
+      border-left: 3px solid transparent; transition: all 0.12s;
     }
 
-    .hero-stats {
+    .recent-item:hover { background: var(--surface2); color: var(--text); border-left-color: var(--border2); }
+    .recent-item .rt { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .no-item { padding: 5px 14px; font-size: 11px; color: var(--muted); font-style: italic; }
+
+    .sidebar-footer {
+      flex-shrink: 0; border-top: 1px solid var(--border);
+      padding: 9px 14px; font-size: 11px; color: var(--muted);
+    }
+
+    .sidebar-footer span { color: var(--accent); font-weight: 600; }
+
+    /* ══════════════════════════════
+       MAIN AREA
+    ══════════════════════════════ */
+    .main {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .topbar {
+      height: 44px; flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 12px;
+    }
+
+    .tab-switcher {
       display: flex;
-      justify-content: center;
-      gap: 32px;
-      flex-wrap: wrap;
-    }
-
-    .stat {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 3px;
       gap: 2px;
     }
 
-    .stat-value {
-      font-size: 22px;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-label { font-size: 12px; color: var(--muted); }
-
-    /* ── MAIN LAYOUT ── */
-    .app {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 260px 1fr;
-      gap: 0;
-      max-width: 1200px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 0 24px 40px;
-    }
-
-    /* ── SIDEBAR ── */
-    .sidebar {
-      padding: 0 20px 0 0;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .sidebar-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--muted);
-      padding: 0 4px;
-      margin-bottom: 4px;
-    }
-
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-    }
-
-    /* PDF list */
-    .pdf-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-
-    .pdf-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 10px;
-      border-radius: 9px;
-      font-size: 13px;
+    .tab-btn {
+      padding: 5px 16px;
+      border-radius: 6px;
+      border: none;
+      background: none;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      color: var(--sub);
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-      color: var(--muted);
-      border: 1px solid transparent;
-    }
-
-    .pdf-item:hover { background: rgba(79,142,247,0.06); color: var(--text); }
-
-    .pdf-item.active {
-      background: rgba(79,142,247,0.1);
-      border-color: rgba(79,142,247,0.25);
-      color: var(--text);
-    }
-
-    .pdf-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .pdf-item[data-value="all"] .pdf-dot { background: var(--accent2); }
-
-    .pdf-name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      transition: all 0.15s;
+      display: flex; align-items: center; gap: 6px;
       white-space: nowrap;
     }
 
-    /* Upload */
-    .upload-zone {
-      border: 2px dashed var(--border);
-      border-radius: 10px;
-      padding: 20px 12px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    .upload-zone:hover {
-      border-color: var(--accent);
-      background: rgba(79,142,247,0.04);
+    .topbar-scope {
+      margin-left: auto;
+      font-size: 11.5px; color: var(--sub);
+      display: flex; align-items: center; gap: 6px;
     }
 
-    .upload-zone input { display: none; }
-    .upload-icon { font-size: 24px; margin-bottom: 8px; }
-    .upload-zone p { font-size: 13px; color: var(--muted); }
-    .upload-zone span { font-size: 11px; color: var(--muted); margin-top: 4px; display: block; }
-
-    #upload-status {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-      min-height: 16px;
-    }
-
-    #upload-status.ok  { color: var(--success); }
-    #upload-status.err { color: var(--danger); }
-
-    /* ── CHAT ── */
-    .chat-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .chat-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .chat-header h2 { font-size: 15px; font-weight: 600; }
-    .chat-header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-    #scope-tag {
-      font-size: 12px;
-      background: rgba(79,142,247,0.1);
-      border: 1px solid rgba(79,142,247,0.2);
+    .scope-pill {
+      background: var(--accent-bg);
+      border: 1px solid rgba(0,120,212,0.2);
       color: var(--accent);
-      padding: 4px 12px;
-      border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 9px; border-radius: 20px;
     }
 
-    /* messages */
-    #messages {
+    /* ── SPLIT WORKSPACE ── */
+    .workspace {
+      flex: 1; display: flex; overflow: hidden; position: relative;
+    }
+
+    .panel {
+      display: flex; flex-direction: column; overflow: hidden;
+      min-width: 200px;
+    }
+
+    .panel-left  { flex: 1; }
+    .panel-right { flex: 1; }
+
+    /* mode-chat: hide PDF panel */
+    .workspace.mode-chat .panel-right { display: none; }
+    .workspace.mode-chat .divider     { display: none; }
+    /* mode-split: both visible */
+
+    /* Draggable divider */
+    .divider {
+      width: var(--divider-w);
+      flex-shrink: 0;
+      background: var(--border);
+      cursor: col-resize;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .divider:hover, .divider.dragging { background: var(--accent); }
+
+    .divider-handle {
+      width: 3px; height: 32px;
+      background: var(--border2);
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .divider:hover .divider-handle, .divider.dragging .divider-handle {
+      background: rgba(255,255,255,0.6);
+    }
+
+    /* Panel headers */
+    .panel-header {
+      height: 36px; flex-shrink: 0;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 14px; gap: 8px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      color: var(--sub);
+    }
+
+    /* ── SHARED CHAT STYLES ── */
+    .msgs {
+      flex: 1; overflow-y: auto;
+      padding: 16px; display: flex;
+      flex-direction: column; gap: 14px;
+    }
+
+    .msgs::-webkit-scrollbar { width: 5px; }
+    .msgs::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    /* Landing */
+    .panel-landing {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px; padding: 30px 20px; text-align: center;
+    }
+
+    .landing-icon {
+      width: 52px; height: 52px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: var(--shadow);
+    }
+
+    .panel-landing h3 { font-size: 15px; font-weight: 600; }
+    .panel-landing p  { font-size: 12px; color: var(--sub); max-width: 260px; line-height: 1.6; }
+
+    .suggest-list { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 300px; }
+
+    .sug {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; padding: 8px 12px;
+      font-size: 12px; color: var(--sub); cursor: pointer;
+      text-align: left; transition: all 0.13s; box-shadow: var(--shadow);
+    }
+
+    .sug:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+    /* Bubbles */
+    .q-row { display: flex; justify-content: flex-end; }
+
+    .bubble-user {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 14px 14px 3px 14px;
+      padding: 9px 13px;
+      font-size: 13px; font-weight: 500;
+      max-width: 78%; line-height: 1.5;
+    }
+
+    .bubble-user.purple { background: var(--accent2); }
+
+    .bubble-ai {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-      min-height: 420px;
-      max-height: 500px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      scroll-behavior: smooth;
+      border-radius: 3px 14px 14px 14px;
+      padding: 10px 14px;
+      font-size: 13px; line-height: 1.75;
+      max-width: 90%; color: var(--text);
+      white-space: pre-wrap;
+      box-shadow: var(--shadow);
     }
 
-    #messages::-webkit-scrollbar { width: 4px; }
-    #messages::-webkit-scrollbar-track { background: transparent; }
-    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-
-    .empty-state {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      gap: 12px;
-      padding: 40px 0;
+    /* Thinking */
+    .thinking-row {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--sub); font-size: 12px;
     }
 
-    .empty-icon { font-size: 48px; filter: grayscale(0.3); }
-    .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); }
-    .empty-state p  { font-size: 13px; text-align: center; max-width: 300px; line-height: 1.6; }
+    .thinking-dots { display: flex; gap: 4px; }
+    .thinking-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor; animation: bob 1.2s ease infinite; opacity: .4;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: 0.18s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.36s; }
 
-    .suggestions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-top: 8px;
+    @keyframes bob {
+      0%,60%,100% { transform: translateY(0); opacity:.3; }
+      30%          { transform: translateY(-5px); opacity:1; }
     }
 
-    .suggestion {
-      font-size: 12px;
+    /* ── CODE SEARCH ANSWER ── */
+    .response-card {
+      background: var(--surface);
       border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      color: var(--muted);
+      border-radius: 9px; overflow: hidden;
+      box-shadow: var(--shadow);
     }
 
-    .suggestion:hover {
-      background: rgba(79,142,247,0.08);
-      border-color: var(--accent);
-      color: var(--text);
+    .resp-section { border-bottom: 1px solid var(--border); }
+    .resp-section:last-child { border-bottom: none; }
+
+    .resp-lbl {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.7px; text-transform: uppercase;
+      padding: 8px 14px; background: var(--surface2);
+      border-bottom: 1px solid var(--border);
     }
 
-    /* message bubbles */
-    .msg { display: flex; flex-direction: column; gap: 8px; max-width: 88%; }
-    .msg.user  { align-self: flex-end; align-items: flex-end; }
-    .msg.agent { align-self: flex-start; }
+    .resp-lbl.answer { color: var(--green); }
+    .resp-lbl.ref    { color: var(--yellow); }
+    .resp-lbl.snip   { color: var(--orange); }
 
-    .msg-meta {
-      font-size: 11px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .msg-avatar {
-      width: 20px; height: 20px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px;
-    }
-
-    .msg.user  .msg-avatar { background: var(--user-bg); }
-    .msg.agent .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
-
-    .bubble {
-      padding: 13px 16px;
-      border-radius: 14px;
-      font-size: 14px;
-      line-height: 1.65;
+    .resp-body {
+      padding: 12px 16px;
+      font-size: 13px; line-height: 1.8; color: var(--text);
       white-space: pre-wrap;
     }
 
-    .msg.user  .bubble { background: var(--user-bg);  border-bottom-right-radius: 4px; }
-    .msg.agent .bubble { background: var(--agent-bg); border-bottom-left-radius: 4px; border: 1px solid var(--border); }
-
-    /* snippets */
-    .snippets-toggle {
-      font-size: 12px;
-      color: var(--accent);
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      gap: 4px;
+    .ref-body {
+      padding: 10px 16px;
+      font-size: 12.5px; font-weight: 600; color: var(--yellow);
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--yellow-bg);
     }
 
-    .snippets-toggle:hover { text-decoration: underline; }
-
-    .snippets { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-
-    .snippet {
-      background: rgba(10,12,20,0.6);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.5;
+    .snip-body {
+      padding: 11px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px; line-height: 1.7; color: var(--orange);
+      background: var(--orange-bg);
+      white-space: pre-wrap; word-break: break-word;
+      border-left: 3px solid var(--orange);
     }
 
-    .snippet-header {
-      font-size: 11px;
-      font-weight: 600;
-      color: #94a3b8;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .resp-footer {
+      padding: 7px 12px; background: var(--surface2);
+      display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
     }
 
-    .snippet-page {
-      background: rgba(79,142,247,0.15);
-      color: var(--accent);
-      padding: 1px 7px;
-      border-radius: 10px;
-      font-size: 10px;
+    .copy-btn {
+      background: none; border: 1px solid var(--border2);
+      border-radius: 4px; padding: 2px 9px;
+      font-size: 11px; font-family: inherit; color: var(--sub);
+      cursor: pointer; transition: all 0.13s;
     }
 
-    /* typing */
-    .typing-bubble {
-      background: var(--agent-bg);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      border-bottom-left-radius: 4px;
-      padding: 14px 18px;
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      width: fit-content;
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+    /* Page reference pills */
+    .page-ref-link {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: var(--accent-bg);
+      border: 1px solid rgba(0,120,212,0.25);
+      color: var(--accent); border-radius: 4px;
+      padding: 2px 8px; font-size: 11px; font-weight: 600;
+      cursor: pointer; text-decoration: none; margin: 2px;
+      transition: all 0.13s;
     }
 
-    .typing-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--muted);
-      animation: bounce 1.2s infinite;
+    .page-ref-link:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Error / warn */
+    .err {
+      background: #fde8e8; border: 1px solid rgba(220,38,38,0.2);
+      border-radius: 7px; padding: 9px 13px;
+      font-size: 12.5px; color: #c92a2a;
     }
 
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes bounce {
-      0%, 60%, 100% { transform: translateY(0); }
-      30% { transform: translateY(-5px); }
+    .warn {
+      background: var(--yellow-bg); border: 1px solid rgba(125,82,0,0.2);
+      border-radius: 7px; padding: 9px 13px;
+      font-size: 12.5px; color: var(--yellow);
     }
 
-    /* input */
-    .input-area {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 12px 12px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: border-color 0.2s;
-    }
-
-    .input-area:focus-within { border-color: rgba(79,142,247,0.5); }
-
-    #question {
-      flex: 1;
-      background: none;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.5;
-      resize: none;
-      height: 24px;
-      max-height: 120px;
-      font-family: inherit;
-    }
-
-    #question::placeholder { color: var(--muted); }
-
-    #send-btn {
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border: none;
-      border-radius: 10px;
-      width: 40px; height: 40px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      font-size: 18px;
-      transition: opacity 0.2s, transform 0.1s;
+    /* ── ASK MODE TOGGLE ── */
+    .ask-mode-toggle {
+      display: flex; gap: 4px;
+      padding: 6px 14px 5px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
 
-    #send-btn:hover   { opacity: 0.85; transform: scale(1.03); }
-    #send-btn:active  { transform: scale(0.97); }
-    #send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .ask-mode-btn {
+      flex: 1; padding: 5px 10px;
+      border-radius: 6px; border: 1px solid var(--border);
+      background: none; font-size: 11.5px; font-family: inherit;
+      font-weight: 500; color: var(--sub); cursor: pointer;
+      transition: all 0.15s;
+    }
 
-    /* ── FOOTER ── */
-    footer {
-      text-align: center;
-      padding: 20px;
-      font-size: 12px;
-      color: var(--muted);
+    .ask-mode-btn.active {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+
+    .ask-mode-btn.active.purple-mode {
+      background: var(--accent2); border-color: var(--accent2);
+    }
+
+    /* ── INPUT BAR ── */
+    .ask-bar {
+      flex-shrink: 0;
+      padding: 10px 14px 12px;
+      background: var(--surface);
       border-top: 1px solid var(--border);
     }
 
-    /* ── RESPONSIVE ── */
+    .ask-inner {
+      display: flex; align-items: flex-end; gap: 7px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      padding: 7px 7px 7px 12px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .ask-inner.purple-focus:focus-within {
+      border-color: var(--accent2);
+      box-shadow: 0 0 0 2px rgba(124,58,237,0.1);
+    }
+
+    .ask-inner.blue-focus:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,120,212,0.1);
+    }
+
+    .ask-inner textarea {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--text); font-size: 13px; font-family: inherit;
+      resize: none; min-height: 20px; max-height: 100px; line-height: 1.5; padding: 2px 0;
+    }
+
+    .ask-inner textarea::placeholder { color: var(--muted); }
+
+    .send-btn {
+      width: 32px; height: 32px;
+      border: none; border-radius: 7px;
+      color: #fff; font-size: 15px;
+      cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.13s, transform 0.1s;
+    }
+
+    .send-btn.blue   { background: var(--accent); }
+    .send-btn.purple { background: var(--accent2); }
+    .send-btn:hover  { filter: brightness(1.1); }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { background: var(--muted); cursor: not-allowed; }
+
+    /* ══════════════════════════════
+       PDF VIEWER (RIGHT PANEL)
+    ══════════════════════════════ */
+    .pdf-toolbar {
+      height: 42px; flex-shrink: 0;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 12px; gap: 8px;
+      font-size: 12px;
+    }
+
+    .pdf-toolbar-title {
+      flex: 1; font-weight: 600; font-size: 11.5px;
+      color: var(--text); overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .pdf-toolbar-controls {
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+    }
+
+    .pdf-page-info {
+      font-size: 11px; color: var(--sub);
+      min-width: 72px; text-align: right; margin-right: 4px;
+    }
+
+    .pdf-nav-btn, .pdf-zoom-btn {
+      width: 26px; height: 26px;
+      border: 1px solid var(--border2); border-radius: 4px;
+      background: var(--surface); color: var(--text);
+      font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit; transition: all 0.13s;
+      line-height: 1;
+    }
+
+    .pdf-nav-btn:hover, .pdf-zoom-btn:hover {
+      background: var(--accent-bg); border-color: var(--accent); color: var(--accent);
+    }
+
+    .pdf-zoom-label {
+      font-size: 11px; color: var(--sub);
+      min-width: 36px; text-align: center; font-weight: 600;
+    }
+
+    .pdf-viewer-scroll {
+      flex: 1; overflow-y: auto; overflow-x: auto;
+      background: #525659;
+      display: flex; flex-direction: column;
+      align-items: center; padding: 16px 0; gap: 10px;
+    }
+
+    .pdf-viewer-scroll::-webkit-scrollbar { width: 8px; }
+    .pdf-viewer-scroll::-webkit-scrollbar-track { background: #3a3d40; }
+    .pdf-viewer-scroll::-webkit-scrollbar-thumb { background: #686b6e; border-radius: 4px; }
+    .pdf-viewer-scroll::-webkit-scrollbar-thumb:hover { background: #888; }
+
+    .pdf-page-wrapper {
+      position: relative;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+    }
+
+    .pdf-page-wrapper.placeholder {
+      background: #d8d8d8;
+      display: flex; align-items: center; justify-content: center;
+      color: #999; font-size: 12px;
+    }
+
+    .pdf-page-wrapper canvas { display: block; }
+
+    .pdf-page-num {
+      position: absolute; bottom: 6px; right: 8px;
+      font-size: 10px;
+      background: rgba(0,0,0,0.5); color: #fff;
+      padding: 1px 6px; border-radius: 3px;
+      pointer-events: none;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .pdf-page-wrapper.page-highlight {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .pdf-empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; padding: 80px 30px;
+      text-align: center; color: #bbb;
+    }
+
+    .pdf-empty-state .pdf-empty-icon {
+      font-size: 40px; opacity: 0.5;
+    }
+
+    .pdf-empty-state h3 { font-size: 15px; font-weight: 600; color: #ccc; }
+    .pdf-empty-state p  { font-size: 12px; color: #999; max-width: 200px; line-height: 1.6; }
+
+    .pdf-loading-state {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      padding: 60px 20px; color: #bbb; font-size: 13px;
+    }
+
     @media (max-width: 700px) {
-      .app { grid-template-columns: 1fr; padding: 0 12px 32px; }
-      .sidebar { padding: 0; }
-      .hero { padding: 40px 16px 32px; }
-      .hero-stats { gap: 20px; }
+      .sidebar { display: none; }
+      .panel { min-width: 100px; }
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <div class="nav-brand">
-    <div class="icon">⚙️</div>
-    EngineAI
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="brand">
+    <div class="brand-logo">⚙</div>
+    <span class="brand-name">EngineAI</span>
+    <span class="brand-tag">Beta</span>
   </div>
-  <span class="nav-badge">Beta</span>
+
+  <button class="new-btn" onclick="clearAll()">＋ New Session</button>
+
+  <div class="search-wrap">
+    <input type="text" placeholder="Search recent…" oninput="filterRecent(this.value)"/>
+  </div>
+
+  <div class="sidebar-content">
+    <div class="sec-label">Documents</div>
+    <div id="doc-list"><div class="no-item">Loading…</div></div>
+
+    <div class="sec-label" style="margin-top:8px">Recent</div>
+    <div id="recent-list"><div class="no-item">No recent queries</div></div>
+  </div>
+
+  <div class="sidebar-footer"><span id="doc-count">—</span> documents loaded</div>
 </nav>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-eyebrow">⚡ Powered by Gemini AI</div>
-  <h1>Your Engineering Codes,<br/><span>Instantly Searchable</span></h1>
-  <p>Ask questions across ACI 318, ACI 350, ASCE 7 and more — get precise answers with page references in seconds.</p>
-  <div class="hero-stats">
-    <div class="stat">
-      <span class="stat-value" id="stat-docs">—</span>
-      <span class="stat-label">Documents</span>
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="tab-switcher">
+      <button class="tab-btn active" id="btn-split" onclick="setMode('split')">⬛⬜ Chat + PDF</button>
+      <button class="tab-btn" id="btn-chat" onclick="setMode('chat')">💬 Chat Only</button>
     </div>
-    <div class="stat">
-      <span class="stat-value">AI</span>
-      <span class="stat-label">Powered Search</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">100%</span>
-      <span class="stat-label">Local Vector DB</span>
+    <div class="topbar-scope">
+      Document: <span class="scope-pill" id="scope-pill">None selected</span>
     </div>
   </div>
-</section>
 
-<!-- APP -->
-<div class="app">
+  <!-- Workspace -->
+  <div class="workspace mode-split" id="workspace">
 
-  <!-- SIDEBAR -->
-  <div class="sidebar">
+    <!-- LEFT PANEL: Unified Chat + Code Search -->
+    <div class="panel panel-left" id="panel-left">
+      <div class="panel-header">⚙ EngineAI Assistant</div>
 
-    <div class="panel">
-      <div class="sidebar-title">Documents</div>
-      <ul class="pdf-list" id="pdf-list">
-        <li class="pdf-item active" data-value="all">
-          <span class="pdf-dot" style="background:var(--accent2)"></span>
-          <span class="pdf-name">All Documents</span>
-        </li>
-      </ul>
-    </div>
-
-  </div>
-
-  <!-- CHAT -->
-  <div class="chat-wrap">
-
-    <div class="chat-header">
-      <div>
-        <h2>Ask your documents</h2>
-        <p>Searching across your engineering code library</p>
+      <!-- Unified message stream -->
+      <div class="msgs" id="unified-msgs">
+        <div class="panel-landing" id="unified-landing">
+          <div class="landing-icon">⚙</div>
+          <h3>EngineAI Assistant</h3>
+          <p>Chat with the AI or search engineering code documents. Select a document and switch to Code Search mode.</p>
+          <div class="suggest-list">
+            <button class="sug" onclick="suggest('Explain the difference between ACI 318 and ACI 350', 'chat')">Explain the difference between ACI 318 and ACI 350</button>
+            <button class="sug" onclick="suggest('Minimum slab thickness without interior beams', 'code')">Minimum slab thickness without interior beams</button>
+            <button class="sug" onclick="suggest('How do I calculate shear capacity of a beam?', 'chat')">How do I calculate shear capacity of a beam?</button>
+            <button class="sug" onclick="suggest('Crack width limits ACI 350', 'code')">Crack width limits ACI 350</button>
+          </div>
+        </div>
       </div>
-      <span id="scope-tag">All Documents</span>
-    </div>
 
-    <div id="messages">
-      <div class="empty-state">
-        <div class="empty-icon">📐</div>
-        <h3>Ask anything</h3>
-        <p>Get answers from your engineering codes with exact page references</p>
-        <div class="suggestions">
-          <span class="suggestion" onclick="prefill(this)">Minimum slab thickness ACI 318</span>
-          <span class="suggestion" onclick="prefill(this)">Wind load ASCE 7</span>
-          <span class="suggestion" onclick="prefill(this)">Crack width limits ACI 350</span>
-          <span class="suggestion" onclick="prefill(this)">Load combinations</span>
+      <!-- Ask mode toggle -->
+      <div class="ask-mode-toggle">
+        <button class="ask-mode-btn active purple-mode" id="ask-mode-chat" onclick="setAskMode('chat')">💬 General Chat</button>
+        <button class="ask-mode-btn" id="ask-mode-code" onclick="setAskMode('code')">📄 Code Search</button>
+      </div>
+
+      <!-- Single input bar -->
+      <div class="ask-bar">
+        <div class="ask-inner purple-focus" id="ask-inner">
+          <textarea id="unified-input" placeholder="Ask a general engineering question…" rows="1"
+            onkeydown="handleUnifiedKey(event)" oninput="resizeTA(this)"></textarea>
+          <button class="send-btn purple" id="unified-send" onclick="sendUnified()">↑</button>
         </div>
       </div>
     </div>
 
-    <div class="input-area">
-      <textarea id="question" rows="1" placeholder="Ask a question about your engineering codes…"></textarea>
-      <button id="send-btn" title="Send">➤</button>
+    <!-- DIVIDER -->
+    <div class="divider" id="divider">
+      <div class="divider-handle"></div>
     </div>
 
-  </div>
-</div>
+    <!-- RIGHT PANEL: PDF Viewer -->
+    <div class="panel panel-right" id="panel-right">
 
-<!-- FOOTER -->
-<footer>
-  EngineAI &mdash; Private engineering knowledge base &bull; Powered by Gemini &amp; ChromaDB
-</footer>
+      <!-- PDF Toolbar -->
+      <div class="pdf-toolbar">
+        <span class="pdf-toolbar-title" id="pdf-toolbar-title">No document loaded</span>
+        <div class="pdf-toolbar-controls">
+          <span class="pdf-page-info">
+            Page <span id="pdf-current-page">—</span> / <span id="pdf-total-pages">—</span>
+          </span>
+          <button class="pdf-nav-btn" onclick="pdfJumpPage(-1)" title="Previous page">‹</button>
+          <button class="pdf-nav-btn" onclick="pdfJumpPage(1)"  title="Next page">›</button>
+          <button class="pdf-zoom-btn" onclick="pdfZoomOut()" title="Zoom out">−</button>
+          <span class="pdf-zoom-label" id="pdf-zoom-label">150%</span>
+          <button class="pdf-zoom-btn" onclick="pdfZoomIn()" title="Zoom in">+</button>
+        </div>
+      </div>
+
+      <!-- Scrollable canvas area -->
+      <div class="pdf-viewer-scroll" id="pdf-viewer-scroll">
+        <div class="pdf-empty-state" id="pdf-empty-state">
+          <div class="pdf-empty-icon">📄</div>
+          <h3>No Document Loaded</h3>
+          <p>Select a document from the sidebar to view it here.</p>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /workspace -->
+</main>
 
 <script>
-  let selectedPdf = null;
+  // ── State ──
+  let selectedPdf  = null;
+  let chatHistory  = [];
+  let allRecent    = [];
+  let currentMode  = 'split';
+  let askMode      = 'chat';
+
+  // PDF viewer state
+  let pdfDoc        = null;
+  let pdfTotalPages = 0;
+  let pdfPageWidth  = 0;
+  let pdfPageHeight = 0;
+  let pdfScale      = 1.5;
+  let pdfCurrentPage = 1;
+  let pdfLoadedName  = null;
+  let pageObserver   = null;
+  let renderQueue    = new Set();
+
+  // ── Mode switching ──
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('workspace').className = 'workspace mode-' + mode;
+    document.getElementById('btn-split').classList.toggle('active', mode === 'split');
+    document.getElementById('btn-chat').classList.toggle('active',  mode === 'chat');
+  }
+
+  // ── Ask mode toggle ──
+  function setAskMode(mode) {
+    askMode = mode;
+    const ta    = document.getElementById('unified-input');
+    const btn   = document.getElementById('unified-send');
+    const inner = document.getElementById('ask-inner');
+    document.getElementById('ask-mode-chat').classList.toggle('active', mode === 'chat');
+    document.getElementById('ask-mode-code').classList.toggle('active', mode === 'code');
+
+    if (mode === 'chat') {
+      ta.placeholder = 'Ask a general engineering question…';
+      btn.className  = 'send-btn purple';
+      inner.className = 'ask-inner purple-focus';
+    } else {
+      const short = selectedPdf
+        ? (selectedPdf.length > 26 ? selectedPdf.slice(0,26)+'…' : selectedPdf)
+        : 'selected document';
+      ta.placeholder = `Ask about ${short}…`;
+      btn.className  = 'send-btn blue';
+      inner.className = 'ask-inner blue-focus';
+    }
+    ta.focus();
+  }
+
+  // ── Draggable divider ──
+  (function() {
+    const divider = document.getElementById('divider');
+    const left    = document.getElementById('panel-left');
+    let dragging  = false, startX = 0, startLeft = 0;
+
+    divider.addEventListener('mousedown', e => {
+      dragging = true;
+      startX = e.clientX;
+      startLeft = left.getBoundingClientRect().width;
+      divider.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const delta   = e.clientX - startX;
+      const newLeft = Math.max(200, Math.min(startLeft + delta, window.innerWidth - 400));
+      left.style.flex  = 'none';
+      left.style.width = newLeft + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      divider.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+  })();
 
   // ── Load PDFs ──
   async function loadPdfs() {
     try {
-      const res  = await fetch('/pdfs');
-      const data = await res.json();
-      const list = document.getElementById('pdf-list');
-      document.getElementById('stat-docs').textContent = data.pdfs.length;
-
-      data.pdfs.forEach(pdf => {
-        const li = document.createElement('li');
-        li.className = 'pdf-item';
-        li.dataset.value = pdf;
-        const shortName = pdf.length > 30 ? pdf.slice(0, 30) + '…' : pdf;
-        li.innerHTML = `<span class="pdf-dot"></span><span class="pdf-name" title="${pdf}">${shortName}</span>`;
-        li.onclick = () => selectPdf(pdf, li);
-        list.appendChild(li);
+      const { pdfs } = await fetch('/pdfs').then(r => r.json());
+      document.getElementById('doc-count').textContent = pdfs.length;
+      const wrap = document.getElementById('doc-list');
+      wrap.innerHTML = '';
+      pdfs.forEach(pdf => {
+        const el = document.createElement('div');
+        el.className = 'doc-item';
+        el.dataset.val = pdf;
+        const short = pdf.length > 22 ? pdf.slice(0, 22) + '…' : pdf;
+        el.innerHTML = `<span class="di">📄</span><span class="dn" title="${esc(pdf)}">${esc(short)}</span>`;
+        el.onclick = () => selectDoc(pdf, el);
+        wrap.appendChild(el);
       });
-    } catch(e) {
-      document.getElementById('stat-docs').textContent = '?';
-    }
+    } catch { document.getElementById('doc-count').textContent = '?'; }
   }
 
-  function selectPdf(pdf, el) {
-    document.querySelectorAll('.pdf-item').forEach(l => l.classList.remove('active'));
+  function selectDoc(pdf, el) {
+    document.querySelectorAll('.doc-item').forEach(d => d.classList.remove('active'));
     el.classList.add('active');
-    selectedPdf = (pdf === 'all') ? null : pdf;
-    document.getElementById('scope-tag').textContent = selectedPdf || 'All Documents';
-  }
-
-  document.querySelector('[data-value="all"]').onclick = function() { selectPdf('all', this); };
-
-  // ── Suggestions ──
-  function prefill(el) {
-    document.getElementById('question').value = el.textContent;
-    document.getElementById('question').focus();
-  }
-
-  // ── Messages ──
-  function clearEmpty() {
-    const empty = document.querySelector('.empty-state');
-    if (empty) empty.remove();
-  }
-
-  function addMsg(role, text, snippets = [], rawSnippets = []) {
-    clearEmpty();
-    const box = document.getElementById('messages');
-    const wrap = document.createElement('div');
-    wrap.className = `msg ${role}`;
-
-    const meta = document.createElement('div');
-    meta.className = 'msg-meta';
-    meta.innerHTML = role === 'user'
-      ? `<span>You</span><div class="msg-avatar">👤</div>`
-      : `<div class="msg-avatar">⚙</div><span>EngineAI</span>`;
-    wrap.appendChild(meta);
-
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text;
-    wrap.appendChild(bubble);
-
-    if (role === 'agent' && rawSnippets.length) {
-      const btn = document.createElement('button');
-      btn.className = 'snippets-toggle';
-      btn.textContent = `▸ View ${rawSnippets.length} source snippet(s)`;
-      let open = false;
-      const snipBox = document.createElement('div');
-      snipBox.className = 'snippets';
-      snipBox.style.display = 'none';
-
-      rawSnippets.forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'snippet';
-        div.innerHTML = `
-          <div class="snippet-header">
-            📄 ${s.source}
-            <span class="snippet-page">Page ${s.page}</span>
-          </div>
-          ${s.text}…`;
-        snipBox.appendChild(div);
-      });
-
-      btn.onclick = () => {
-        open = !open;
-        snipBox.style.display = open ? 'flex' : 'none';
-        btn.textContent = open
-          ? `▾ Hide snippets`
-          : `▸ View ${rawSnippets.length} source snippet(s)`;
-      };
-
-      wrap.appendChild(btn);
-      wrap.appendChild(snipBox);
+    selectedPdf = pdf;
+    const short = pdf.length > 26 ? pdf.slice(0, 26) + '…' : pdf;
+    document.getElementById('scope-pill').textContent = short;
+    if (askMode === 'code') {
+      document.getElementById('unified-input').placeholder = `Ask about ${short}…`;
     }
-
-    box.appendChild(wrap);
-    box.scrollTop = box.scrollHeight;
+    // Load PDF into right panel
+    loadPdfIntoViewer(pdf);
+    // Ensure split mode so PDF is visible
+    if (currentMode === 'chat') setMode('split');
   }
 
-  function addTyping() {
-    clearEmpty();
-    const box = document.getElementById('messages');
-    const wrap = document.createElement('div');
-    wrap.className = 'msg agent';
-    wrap.id = 'typing-indicator';
-    wrap.innerHTML = `
-      <div class="msg-meta"><div class="msg-avatar">⚙</div><span>EngineAI</span></div>
-      <div class="typing-bubble">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-      </div>`;
-    box.appendChild(wrap);
-    box.scrollTop = box.scrollHeight;
+  // ── Recent ──
+  function saveRecent(q, pdf) {
+    const stored  = JSON.parse(localStorage.getItem('engineai_recent') || '[]');
+    const updated = [{ q, pdf, ts: Date.now() }, ...stored.filter(r => r.q !== q)].slice(0, 20);
+    localStorage.setItem('engineai_recent', JSON.stringify(updated));
+    allRecent = updated;
+    renderRecent(allRecent);
   }
 
-  function removeTyping() {
-    const t = document.getElementById('typing-indicator');
-    if (t) t.remove();
+  function loadRecent() {
+    allRecent = JSON.parse(localStorage.getItem('engineai_recent') || '[]');
+    renderRecent(allRecent);
   }
 
-  // ── Send ──
-  async function send() {
-    const input = document.getElementById('question');
-    const btn   = document.getElementById('send-btn');
-    const q = input.value.trim();
+  function renderRecent(items) {
+    const wrap = document.getElementById('recent-list');
+    if (!items.length) { wrap.innerHTML = '<div class="no-item">No recent queries</div>'; return; }
+    wrap.innerHTML = items.map((r, i) =>
+      `<div class="recent-item" onclick="reRun(${i})" title="${esc(r.q)}">
+        <span>🕐</span><span class="rt">${esc(r.q)}</span>
+      </div>`
+    ).join('');
+  }
+
+  function filterRecent(v) {
+    renderRecent(v ? allRecent.filter(r => r.q.toLowerCase().includes(v.toLowerCase())) : allRecent);
+  }
+
+  function reRun(idx) {
+    const r = allRecent[idx];
+    if (!r) return;
+    if (r.pdf) {
+      const el = [...document.querySelectorAll('.doc-item')].find(d => d.dataset.val === r.pdf);
+      if (el) selectDoc(r.pdf, el);
+    }
+    setAskMode('code');
+    document.getElementById('unified-input').value = r.q;
+    resizeTA(document.getElementById('unified-input'));
+    sendUnified();
+  }
+
+  // ── Clear all ──
+  function clearAll() {
+    chatHistory = [];
+    addUnifiedLanding();
+  }
+
+  function addUnifiedLanding() {
+    const m = document.getElementById('unified-msgs');
+    m.innerHTML = `<div class="panel-landing" id="unified-landing">
+      <div class="landing-icon">⚙</div>
+      <h3>EngineAI Assistant</h3>
+      <p>Chat with the AI or search engineering code documents. Select a document and switch to Code Search mode.</p>
+      <div class="suggest-list">
+        <button class="sug" onclick="suggest('Explain the difference between ACI 318 and ACI 350', 'chat')">Explain the difference between ACI 318 and ACI 350</button>
+        <button class="sug" onclick="suggest('Minimum slab thickness without interior beams', 'code')">Minimum slab thickness without interior beams</button>
+        <button class="sug" onclick="suggest('How do I calculate shear capacity of a beam?', 'chat')">How do I calculate shear capacity of a beam?</button>
+        <button class="sug" onclick="suggest('Crack width limits ACI 350', 'code')">Crack width limits ACI 350</button>
+      </div></div>`;
+  }
+
+  function suggest(text, mode) {
+    setAskMode(mode);
+    document.getElementById('unified-input').value = text;
+    resizeTA(document.getElementById('unified-input'));
+    sendUnified();
+  }
+
+  // ── Helpers ──
+  function resizeTA(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 100) + 'px';
+  }
+
+  function handleUnifiedKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUnified(); }
+  }
+
+  function removeLanding(msgs) { msgs.querySelector('.panel-landing')?.remove(); }
+
+  function appendBubble(msgs, text, type, color) {
+    const d = document.createElement('div');
+    if (type === 'user') {
+      d.className = 'q-row';
+      d.innerHTML = `<div class="bubble-user ${color}">${esc(text)}</div>`;
+    } else {
+      d.innerHTML = `<div class="bubble-ai">${esc(text)}</div>`;
+    }
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    return d;
+  }
+
+  function appendThinking(msgs, label) {
+    const d = document.createElement('div');
+    d.className = 'thinking-row';
+    d.innerHTML = `<div class="thinking-dots"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${label}`;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    return d;
+  }
+
+  // ── SEND ROUTER ──
+  function sendUnified() {
+    if (askMode === 'chat') sendChat();
+    else sendCode();
+  }
+
+  // ── GENERAL CHAT ──
+  async function sendChat() {
+    const ta  = document.getElementById('unified-input');
+    const btn = document.getElementById('unified-send');
+    const q   = ta.value.trim();
     if (!q) return;
 
-    addMsg('user', q);
-    input.value = '';
-    input.style.height = '24px';
+    ta.value = ''; ta.style.height = 'auto';
     btn.disabled = true;
-    addTyping();
+
+    const msgs = document.getElementById('unified-msgs');
+    removeLanding(msgs);
+    appendBubble(msgs, q, 'user', 'purple');
+
+    const think = appendThinking(msgs, 'Thinking…');
+
+    try {
+      const res  = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, history: chatHistory })
+      });
+      const data = await res.json();
+      think.remove();
+
+      if (!res.ok) {
+        msgs.appendChild(Object.assign(document.createElement('div'), { className: 'err', textContent: '⚠ ' + (data.detail || 'Error') }));
+      } else {
+        appendBubble(msgs, data.reply, 'ai', '');
+        chatHistory.push({ role: 'user', content: q });
+        chatHistory.push({ role: 'assistant', content: data.reply });
+        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+      }
+    } catch {
+      think.remove();
+      msgs.appendChild(Object.assign(document.createElement('div'), { className: 'err', textContent: '⚠ Could not reach server.' }));
+    }
+
+    btn.disabled = false;
+    ta.focus();
+  }
+
+  // ── CODE SEARCH ──
+  async function sendCode() {
+    const ta  = document.getElementById('unified-input');
+    const btn = document.getElementById('unified-send');
+    const q   = ta.value.trim();
+    if (!q) return;
+
+    if (!selectedPdf) {
+      const msgs = document.getElementById('unified-msgs');
+      const w = document.createElement('div');
+      w.className = 'warn'; w.textContent = '⚠ Select a document from the sidebar first.';
+      msgs.appendChild(w);
+      setTimeout(() => w.remove(), 3000);
+      return;
+    }
+
+    ta.value = ''; ta.style.height = 'auto';
+    btn.disabled = true;
+
+    const msgs = document.getElementById('unified-msgs');
+    removeLanding(msgs);
+    appendBubble(msgs, q, 'user', '');
+
+    const think = appendThinking(msgs, `Searching ${selectedPdf}…`);
 
     try {
       const res  = await fetch('/ask', {
@@ -735,30 +1041,293 @@
         body: JSON.stringify({ question: q, pdf_name: selectedPdf })
       });
       const data = await res.json();
-      removeTyping();
-      addMsg('agent', res.ok ? data.answer : '✗ ' + data.detail, [], res.ok ? (data.snippets || []) : []);
+      think.remove();
+      saveRecent(q, selectedPdf);
+
+      if (!res.ok) {
+        msgs.appendChild(Object.assign(document.createElement('div'), { className: 'err', textContent: '⚠ ' + (data.detail || 'Error') }));
+      } else {
+        msgs.appendChild(makeCodeAnswerCard(data));
+      }
     } catch {
-      removeTyping();
-      addMsg('agent', '✗ Could not reach the server. Is it running?');
+      think.remove();
+      msgs.appendChild(Object.assign(document.createElement('div'), { className: 'err', textContent: '⚠ Could not reach server.' }));
     }
 
+    msgs.scrollTop = msgs.scrollHeight;
     btn.disabled = false;
-    input.focus();
+    ta.focus();
   }
 
-  document.getElementById('send-btn').onclick = send;
+  // ── Build code answer card (left panel) ──
+  function makeCodeAnswerCard(data) {
+    const card = document.createElement('div');
+    card.className = 'response-card';
 
-  // auto-resize textarea + Enter to send
-  const ta = document.getElementById('question');
-  ta.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-  });
-  ta.addEventListener('input', () => {
-    ta.style.height = '24px';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  });
+    // Answer
+    const aS = document.createElement('div'); aS.className = 'resp-section';
+    const ansHtml = injectPageRefs(data.answer, data.raw_chunks || []);
+    aS.innerHTML = `<div class="resp-lbl answer">✅ Answer</div><div class="resp-body">${ansHtml}</div>`;
+    card.appendChild(aS);
+
+    // Code Reference
+    if (data.code_ref) {
+      const rS = document.createElement('div'); rS.className = 'resp-section';
+      rS.innerHTML = `<div class="resp-lbl ref">📌 Code Reference</div><div class="ref-body">${esc(data.code_ref)}</div>`;
+      card.appendChild(rS);
+    }
+
+    // Exact Snippet
+    if (data.snippet) {
+      const sS = document.createElement('div'); sS.className = 'resp-section';
+      sS.innerHTML = `<div class="resp-lbl snip">📄 Exact Snippet</div><div class="snip-body">${esc(data.snippet)}</div>`;
+      card.appendChild(sS);
+    }
+
+    // Pages Referenced — clickable pills
+    if (data.raw_chunks?.length) {
+      const pS = document.createElement('div'); pS.className = 'resp-section';
+      pS.innerHTML = `<div class="resp-lbl ref">📑 Pages Referenced</div>`;
+      const pills = document.createElement('div');
+      pills.style.cssText = 'padding:8px 12px 10px; display:flex; flex-wrap:wrap; gap:4px;';
+      const seen = new Set();
+      data.raw_chunks.forEach(chunk => {
+        const key = chunk.page;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const a = document.createElement('a');
+        a.className = 'page-ref-link';
+        a.href = '#';
+        a.textContent = `📄 p.${chunk.page}`;
+        a.title = chunk.source;
+        a.addEventListener('click', e => { e.preventDefault(); scrollToPdfPage(chunk.page); });
+        pills.appendChild(a);
+      });
+      pS.appendChild(pills);
+      card.appendChild(pS);
+    }
+
+    // Footer
+    const ft = document.createElement('div'); ft.className = 'resp-footer';
+    ft.innerHTML = `<button class="copy-btn" onclick="copyAns(this)">📋 Copy Answer</button>`;
+    card.appendChild(ft);
+
+    return card;
+  }
+
+  // Inject "Page N" patterns as clickable links in answer text
+  function injectPageRefs(text, chunks) {
+    const validPages = new Set((chunks || []).map(c => c.page));
+    return esc(text).replace(/\b[Pp](?:age|\.)\s*(\d{1,4})\b/g, (match, num) => {
+      const n = parseInt(num);
+      return `<a class="page-ref-link" href="#" onclick="scrollToPdfPage(${n});return false;">📄 p.${n}</a>`;
+    });
+  }
+
+  // ── PDF VIEWER ──
+  async function loadPdfIntoViewer(pdfName) {
+    if (pdfName === pdfLoadedName) return;
+    pdfLoadedName = pdfName;
+
+    const scroll = document.getElementById('pdf-viewer-scroll');
+
+    // Show loading state
+    scroll.innerHTML = `<div class="pdf-loading-state">
+      <div class="thinking-dots" style="scale:1.5"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>
+      Loading PDF…
+    </div>`;
+    document.getElementById('pdf-toolbar-title').textContent = pdfName;
+    document.getElementById('pdf-current-page').textContent = '—';
+    document.getElementById('pdf-total-pages').textContent  = '—';
+
+    // Disconnect old observer
+    if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
+    renderQueue.clear();
+
+    if (typeof pdfjsLib === 'undefined') {
+      scroll.innerHTML = `<div class="pdf-loading-state" style="color:#f88">PDF.js failed to load. Check internet connection.</div>`;
+      return;
+    }
+
+    try {
+      pdfDoc = await pdfjsLib.getDocument('/pdf-file?pdf=' + encodeURIComponent(pdfName)).promise;
+    } catch (e) {
+      scroll.innerHTML = `<div class="pdf-loading-state" style="color:#f88">⚠ Could not load PDF: ${esc(String(e.message || e))}</div>`;
+      pdfLoadedName = null;
+      return;
+    }
+
+    pdfTotalPages = pdfDoc.numPages;
+    document.getElementById('pdf-total-pages').textContent  = pdfTotalPages;
+    document.getElementById('pdf-current-page').textContent = 1;
+    document.getElementById('pdf-zoom-label').textContent   = Math.round(pdfScale * 100) + '%';
+
+    // Measure page 1 dimensions
+    const page1 = await pdfDoc.getPage(1);
+    const vp1   = page1.getViewport({ scale: pdfScale });
+    pdfPageWidth  = vp1.width;
+    pdfPageHeight = vp1.height;
+
+    // Build placeholder divs
+    scroll.innerHTML = '';
+    for (let p = 1; p <= pdfTotalPages; p++) {
+      const wrapper = makePlaceholder(p);
+      scroll.appendChild(wrapper);
+    }
+
+    // Set up intersection observer
+    setupPageObserver();
+  }
+
+  function makePlaceholder(pageNum) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pdf-page-wrapper placeholder';
+    wrapper.dataset.page = pageNum;
+    wrapper.style.width  = pdfPageWidth  + 'px';
+    wrapper.style.height = pdfPageHeight + 'px';
+
+    const label = document.createElement('div');
+    label.className = 'pdf-page-num';
+    label.textContent = pageNum;
+    wrapper.appendChild(label);
+
+    return wrapper;
+  }
+
+  function setupPageObserver() {
+    const scroll = document.getElementById('pdf-viewer-scroll');
+    pageObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const wrapper = entry.target;
+        const page    = parseInt(wrapper.dataset.page);
+
+        // Update page counter
+        pdfCurrentPage = page;
+        document.getElementById('pdf-current-page').textContent = page;
+
+        // Render this page + ±2 buffer
+        for (let p = Math.max(1, page - 2); p <= Math.min(pdfTotalPages, page + 2); p++) {
+          const w = scroll.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
+          if (w && w.classList.contains('placeholder') && !renderQueue.has(p)) {
+            renderPage(p, w);
+          }
+        }
+      });
+    }, { root: scroll, threshold: 0.1 });
+
+    scroll.querySelectorAll('.pdf-page-wrapper').forEach(w => pageObserver.observe(w));
+  }
+
+  async function renderPage(pageNum, wrapper) {
+    if (renderQueue.has(pageNum)) return;
+    renderQueue.add(pageNum);
+
+    try {
+      const page     = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: pdfScale });
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = viewport.width;
+      canvas.height = viewport.height;
+
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Update wrapper to actual rendered size
+      wrapper.style.width  = viewport.width  + 'px';
+      wrapper.style.height = viewport.height + 'px';
+      wrapper.classList.remove('placeholder');
+      wrapper.innerHTML = '';
+      wrapper.appendChild(canvas);
+
+      const label = document.createElement('div');
+      label.className   = 'pdf-page-num';
+      label.textContent = pageNum;
+      wrapper.appendChild(label);
+
+    } catch (e) {
+      wrapper.innerHTML = `<div style="color:#999;font-size:11px;padding:10px">Page ${pageNum} error</div>`;
+    }
+
+    renderQueue.delete(pageNum);
+  }
+
+  // Scroll PDF to a specific page (called by page-ref-link clicks)
+  function scrollToPdfPage(pageNum) {
+    if (!pdfDoc) return;
+    if (currentMode === 'chat') setMode('split');
+
+    const scroll  = document.getElementById('pdf-viewer-scroll');
+    const wrapper = scroll.querySelector(`.pdf-page-wrapper[data-page="${pageNum}"]`);
+    if (!wrapper) return;
+
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Render immediately if still a placeholder
+    if (wrapper.classList.contains('placeholder')) {
+      renderPage(pageNum, wrapper);
+    }
+
+    // Highlight flash
+    wrapper.classList.add('page-highlight');
+    setTimeout(() => wrapper.classList.remove('page-highlight'), 1800);
+  }
+
+  function pdfJumpPage(delta) {
+    scrollToPdfPage(Math.max(1, Math.min(pdfTotalPages, pdfCurrentPage + delta)));
+  }
+
+  function pdfZoomIn()  { setPdfScale(Math.min(3.0, pdfScale + 0.25)); }
+  function pdfZoomOut() { setPdfScale(Math.max(0.5, pdfScale - 0.25)); }
+
+  async function setPdfScale(newScale) {
+    if (!pdfDoc) return;
+    pdfScale = newScale;
+    document.getElementById('pdf-zoom-label').textContent = Math.round(pdfScale * 100) + '%';
+
+    // Re-measure from page 1
+    const page1 = await pdfDoc.getPage(1);
+    const vp1   = page1.getViewport({ scale: pdfScale });
+    pdfPageWidth  = vp1.width;
+    pdfPageHeight = vp1.height;
+
+    // Reset all wrappers to placeholder at new size
+    renderQueue.clear();
+    const scroll = document.getElementById('pdf-viewer-scroll');
+    scroll.querySelectorAll('.pdf-page-wrapper').forEach(w => {
+      const p = parseInt(w.dataset.page);
+      w.classList.add('placeholder');
+      w.style.width  = pdfPageWidth  + 'px';
+      w.style.height = pdfPageHeight + 'px';
+      w.innerHTML = '';
+      const label = document.createElement('div');
+      label.className = 'pdf-page-num';
+      label.textContent = p;
+      w.appendChild(label);
+    });
+    // Observer fires immediately for visible pages → re-renders them
+  }
+
+  // ── Helpers ──
+  function hlKw(text, query) {
+    if (!query) return esc(text);
+    const words = query.split(/\s+/).filter(w => w.length > 3).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const out = esc(text);
+    return words.length ? out.replace(new RegExp(`(${words.join('|')})`, 'gi'), '<mark>$1</mark>') : out;
+  }
+
+  function copyAns(btn) {
+    const text = btn.closest('.response-card').querySelector('.resp-body').textContent;
+    navigator.clipboard.writeText(text).then(() => { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '📋 Copy Answer', 2000); });
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
   loadPdfs();
+  loadRecent();
 </script>
 </body>
 </html>
