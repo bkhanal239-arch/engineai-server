@@ -1150,7 +1150,12 @@
     }
 
     try {
-      pdfDoc = await pdfjsLib.getDocument('/pdf-file?pdf=' + encodeURIComponent(pdfName)).promise;
+      pdfDoc = await pdfjsLib.getDocument({
+        url: '/pdf-file?pdf=' + encodeURIComponent(pdfName),
+        rangeChunkSize: 65536,
+        disableAutoFetch: true,
+        disableStream: false,
+      }).promise;
     } catch (e) {
       scroll.innerHTML = `<div class="pdf-loading-state" style="color:#f88">⚠ Could not load PDF: ${esc(String(e.message || e))}</div>`;
       pdfLoadedName = null;
