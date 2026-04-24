@@ -82,14 +82,14 @@ def build_retriever(pdf_name=None):
         if not os.path.exists(db_path):
             return None, f"No database found for '{pdf_name}'."
         vector_db = Chroma(persist_directory=db_path, embedding_function=embeddings)
-        return vector_db.as_retriever(search_kwargs={"k": 5}), pdf_name
+        return vector_db.as_retriever(search_kwargs={"k": 8}), pdf_name
 
     ingested = get_ingested_pdfs()
     if not ingested:
         return None, "No databases found on server."
 
     dbs = [Chroma(persist_directory=os.path.join(DB_DIR, name), embedding_function=embeddings) for name in ingested]
-    retrievers = [db.as_retriever(search_kwargs={"k": 2}) for db in dbs]
+    retrievers = [db.as_retriever(search_kwargs={"k": 3}) for db in dbs]
 
     def multi_retrieve(query):
         docs = []
@@ -118,7 +118,7 @@ def build_chain(pdf_name=None):
         model="gemini-2.5-flash",
         temperature=0,
         top_p=1,
-        max_output_tokens=1024,
+        max_output_tokens=4096,
     )
 
     prompt = PromptTemplate.from_template(prompt_text)

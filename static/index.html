@@ -1161,7 +1161,7 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'pdf-page-wrapper placeholder';
     wrapper.dataset.page = pageNum;
-    wrapper.style.minHeight = '400px';
+    wrapper.style.minHeight = '1100px';
     const label = document.createElement('div');
     label.className = 'pdf-page-num';
     label.textContent = pageNum;
@@ -1204,8 +1204,8 @@
         const page = parseInt(wrapper.dataset.page);
         pdfCurrentPage = page;
         document.getElementById('pdf-current-page').textContent = page;
-        // Load this page + 1 ahead
-        for (let p = page; p <= Math.min(pdfTotalPages, page + 1); p++) {
+        // Load this page + 3 ahead
+        for (let p = page; p <= Math.min(pdfTotalPages, page + 3); p++) {
           const w = scroll.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
           if (w && w.classList.contains('placeholder')) loadPageImage(w, p);
         }
