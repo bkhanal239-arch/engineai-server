@@ -405,6 +405,19 @@
 
     .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 
+    /* Reformulated query banner */
+    .reformulated-banner {
+      padding: 7px 14px 7px 12px;
+      background: linear-gradient(90deg, #fff8e1, #fffde7);
+      border-left: 3px solid #f59e0b;
+      border-bottom: 1px solid var(--border);
+      font-size: 11.5px;
+      color: var(--text);
+      display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap;
+    }
+    .rq-label { font-weight: 600; color: #7d5200; white-space: nowrap; flex-shrink: 0; }
+    .rq-text  { color: #1a1a1a; font-style: italic; line-height: 1.4; }
+
     /* Page reference pills */
     .page-ref-link {
       display: inline-flex; align-items: center; gap: 3px;
@@ -1058,6 +1071,14 @@
   function makeCodeAnswerCard(data) {
     const card = document.createElement('div');
     card.className = 'response-card';
+
+    // Reformulated query banner (only shown when question was expanded)
+    if (data.reformulated) {
+      const rq = document.createElement('div');
+      rq.className = 'reformulated-banner';
+      rq.innerHTML = `<span class="rq-label">🔍 Searched as:</span> <span class="rq-text">${esc(data.reformulated)}</span>`;
+      card.appendChild(rq);
+    }
 
     // Answer
     const aS = document.createElement('div'); aS.className = 'resp-section';

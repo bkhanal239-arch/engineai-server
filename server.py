@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import List
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from rag import build_chain, get_ingested_pdfs, parse_response
+from rag import build_chain, get_ingested_pdfs, parse_response, expand_query
 
 load_dotenv()
 
@@ -56,16 +56,20 @@ def ask(request: AskRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
+    # Expand incomplete/vague question before hitting the vector DB
+    expanded = expand_query(request.question)
+    reformulated = expanded if expanded.lower() != request.question.lower().strip() else None
+
     chain, retriever, label = build_chain(request.pdf_name)
 
     if chain is None:
         raise HTTPException(status_code=404, detail=label)
 
     try:
-        raw = chain.invoke(request.question)
+        raw = chain.invoke(expanded)
         parsed = parse_response(raw)
 
-        docs = retriever.invoke(request.question)
+        docs = retriever.invoke(expanded)
         raw_snippets = [
             {
                 "source": os.path.basename(doc.metadata.get("source", "unknown")),
@@ -76,12 +80,13 @@ def ask(request: AskRequest):
         ]
 
         return {
-            "answer":     parsed["answer"],
-            "code_ref":   parsed["code_ref"],
-            "snippet":    parsed["snippet"],
-            "searched":   label,
-            "query":      request.question,
-            "raw_chunks": raw_snippets,
+            "answer":       parsed["answer"],
+            "code_ref":     parsed["code_ref"],
+            "snippet":      parsed["snippet"],
+            "searched":     label,
+            "query":        request.question,
+            "reformulated": reformulated,
+            "raw_chunks":   raw_snippets,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

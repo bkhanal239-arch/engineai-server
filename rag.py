@@ -41,6 +41,27 @@ def get_ingested_pdfs():
     return [name for name in os.listdir(DB_DIR) if os.path.isdir(os.path.join(DB_DIR, name))]
 
 
+def expand_query(question: str) -> str:
+    """Reformulate a vague or incomplete question into a precise engineering code query."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+    messages = [
+        SystemMessage(content=(
+            "You are a structural engineering expert. Your only job is to rewrite the user's question "
+            "into a complete, precise structural engineering code question that can be used to search "
+            "technical PDF documents like ACI 318, ACI 350, ASCE 7, IBC, etc.\n"
+            "Rules:\n"
+            "- If the question is vague (e.g. 'flood' or 'slab'), expand it to the most likely full engineering question.\n"
+            "- If it is already specific and complete, return it unchanged.\n"
+            "- Output ONLY the reformulated question — no explanation, no prefix, no quotes."
+        )),
+        HumanMessage(content=question)
+    ]
+    result = llm.invoke(messages)
+    expanded = result.content.strip().strip('"').strip("'")
+    return expanded if expanded else question
+
+
 def format_context(docs):
     parts = []
     for i, doc in enumerate(docs, 1):
