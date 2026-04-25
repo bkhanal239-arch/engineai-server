@@ -1,9 +1,11 @@
 langchain
 langchain-google-genai
 langchain-community
+langchain-openai
 chromadb
 python-dotenv
 sentence-transformers
 fastapi
 uvicorn[standard]
 pymupdf
+numpy

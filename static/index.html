@@ -405,6 +405,34 @@
 
     .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 
+    /* Cache hit badge */
+    .cache-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+      background: linear-gradient(90deg, #f0faf0, #e8f5e9);
+      border: 1px solid #a5d6a7; color: #2e7d32;
+      margin: 6px 12px 0;
+    }
+
+    /* PDF snippet image */
+    .snippet-img-wrap {
+      padding: 10px 14px 14px;
+      background: #fafafa;
+      border-top: 1px solid var(--border);
+    }
+    .snippet-img-wrap img {
+      max-width: 100%; border-radius: 5px;
+      border: 1px solid var(--border2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .snippet-img-wrap img:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    .snippet-img-label {
+      font-size: 10.5px; color: var(--sub); margin-bottom: 6px;
+      display: flex; align-items: center; gap: 5px;
+    }
+
     /* Reformulated query banner */
     .reformulated-banner {
       padding: 7px 14px 7px 12px;
@@ -1072,6 +1100,15 @@
     const card = document.createElement('div');
     card.className = 'response-card';
 
+    // Cache hit badge
+    if (data.from_cache) {
+      const badge = document.createElement('div');
+      badge.className = 'cache-badge';
+      const pct = data.cache_similarity ? Math.round(data.cache_similarity * 100) : '';
+      badge.innerHTML = `⚡ Instant recall from cache${pct ? ' (' + pct + '% match)' : ''}`;
+      card.appendChild(badge);
+    }
+
     // Reformulated query banner (only shown when question was expanded)
     if (data.reformulated) {
       const rq = document.createElement('div');
@@ -1098,6 +1135,38 @@
       const sS = document.createElement('div'); sS.className = 'resp-section';
       sS.innerHTML = `<div class="resp-lbl snip">📄 Exact Snippet</div><div class="snip-body">${esc(data.snippet)}</div>`;
       card.appendChild(sS);
+    }
+
+    // PDF Snippet Image — cropped page with yellow highlight on the found text
+    if (data.snippet && pdfLoadedName) {
+      // Extract page number from code_ref (e.g. "Page 114") or first chunk
+      let snippetPage = null;
+      if (data.code_ref) {
+        const m = data.code_ref.match(/[Pp]age\s*(\d+)/);
+        if (m) snippetPage = parseInt(m[1]);
+      }
+      if (!snippetPage && data.raw_chunks?.length) snippetPage = data.raw_chunks[0].page;
+
+      if (snippetPage) {
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'resp-section';
+        imgWrap.innerHTML = '<div class="resp-lbl snip">🔍 In Document</div>';
+        const inner = document.createElement('div');
+        inner.className = 'snippet-img-wrap';
+        const lbl = document.createElement('div');
+        lbl.className = 'snippet-img-label';
+        lbl.textContent = `📐 Page ${snippetPage} — click to navigate`;
+        const img = document.createElement('img');
+        img.alt = `Page ${snippetPage} snippet`;
+        img.title = 'Click to go to this page in the PDF viewer';
+        const textParam = data.snippet ? '&text=' + encodeURIComponent(data.snippet.substring(0, 120)) : '';
+        img.src = `/snippet-image?pdf=${encodeURIComponent(pdfLoadedName)}&page=${snippetPage}&scale=2.0${textParam}`;
+        img.addEventListener('click', () => scrollToPdfPage(snippetPage));
+        inner.appendChild(lbl);
+        inner.appendChild(img);
+        imgWrap.appendChild(inner);
+        card.appendChild(imgWrap);
+      }
     }
 
     // Pages Referenced — clickable pills

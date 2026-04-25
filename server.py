@@ -12,7 +12,8 @@ from rag import build_chain, get_ingested_pdfs, parse_response, expand_query
 
 load_dotenv()
 
-PDF_DIR = os.environ.get("PDF_DIR", os.path.join(os.path.dirname(__file__), "my_pdfs"))
+PDF_DIR          = os.environ.get("PDF_DIR", os.path.join(os.path.dirname(__file__), "my_pdfs"))
+USE_HERMES_AGENT = os.environ.get("USE_HERMES_AGENT", "false").lower() == "true"
 
 app = FastAPI(title="EngineAI")
 
@@ -32,7 +33,7 @@ class AskRequest(BaseModel):
 
 
 class ChatMessage(BaseModel):
-    role: str   # "user" or "assistant"
+    role: str
     content: str
 
 
@@ -57,17 +58,39 @@ def ask(request: AskRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    # Expand incomplete/vague question before hitting the vector DB
-    expanded = expand_query(request.question)
-    reformulated = expanded if expanded.lower() != request.question.lower().strip() else None
+    # ── Hermes agent path (OpenRouter cloud) ──────────────────────
+    if USE_HERMES_AGENT:
+        try:
+            from agent import hermes_agent
+            result = hermes_agent(request.question, request.pdf_name)
+            return {
+                "answer":       result.get("answer", ""),
+                "code_ref":     result.get("code_ref", ""),
+                "snippet":      result.get("snippet", ""),
+                "searched":     result.get("searched", ""),
+                "query":        request.question,
+                "reformulated": result.get("reformulated"),
+                "raw_chunks":   result.get("raw_chunks", []),
+                "from_cache":   result.get("from_cache", False),
+                "cache_similarity": result.get("cache_similarity"),
+            }
+        except Exception as e:
+            msg = str(e)
+            if "503" in msg or "UNAVAILABLE" in msg or "overloaded" in msg.lower():
+                raise HTTPException(status_code=503, detail="Hermes is temporarily unavailable. Please try again.")
+            if "429" in msg or "rate" in msg.lower():
+                raise HTTPException(status_code=429, detail="Rate limit reached. Please wait a moment.")
+            raise HTTPException(status_code=500, detail=msg)
 
+    # ── Gemini fallback path ──────────────────────────────────────
+    expanded     = expand_query(request.question)
+    reformulated = expanded if expanded.lower() != request.question.lower().strip() else None
     chain, retriever, label = build_chain(request.pdf_name)
 
     if chain is None:
         raise HTTPException(status_code=404, detail=label)
 
     try:
-        # Retry main chain up to 3 times on transient Gemini 503 errors
         raw = None
         for attempt in range(3):
             try:
@@ -78,18 +101,16 @@ def ask(request: AskRequest):
                     time.sleep(2 ** attempt)
                 else:
                     raise
-        parsed = parse_response(raw)
-
-        docs = retriever.invoke(expanded)
-        raw_snippets = [
+        parsed   = parse_response(raw)
+        docs     = retriever.invoke(expanded)
+        raw_snips = [
             {
                 "source": os.path.basename(doc.metadata.get("source", "unknown")),
-                "page": doc.metadata.get("page", 0) + 1,
-                "text": doc.page_content.strip()[:400],
+                "page":   doc.metadata.get("page", 0) + 1,
+                "text":   doc.page_content.strip()[:400],
             }
             for doc in docs
         ]
-
         return {
             "answer":       parsed["answer"],
             "code_ref":     parsed["code_ref"],
@@ -97,14 +118,15 @@ def ask(request: AskRequest):
             "searched":     label,
             "query":        request.question,
             "reformulated": reformulated,
-            "raw_chunks":   raw_snippets,
+            "raw_chunks":   raw_snips,
+            "from_cache":   False,
         }
     except Exception as e:
         msg = str(e)
         if "503" in msg or "UNAVAILABLE" in msg:
-            raise HTTPException(status_code=503, detail="Gemini is temporarily overloaded. Please try again in a few seconds.")
+            raise HTTPException(status_code=503, detail="Gemini is temporarily overloaded. Please try again.")
         if "429" in msg or "quota" in msg.lower():
-            raise HTTPException(status_code=429, detail="API rate limit reached. Please wait a moment and try again.")
+            raise HTTPException(status_code=429, detail="API rate limit reached. Please wait a moment.")
         raise HTTPException(status_code=500, detail=msg)
 
 
@@ -151,7 +173,7 @@ def page_count(pdf: str = Query(...)):
     if not found:
         raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
     doc = fitz.open(found)
-    n = len(doc)
+    n   = len(doc)
     doc.close()
     return {"count": n}
 
@@ -163,16 +185,90 @@ def page_image(pdf: str = Query(...), page: int = Query(...), scale: float = Que
     found = find_pdf(pdf)
     if not found:
         raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
-    doc = fitz.open(found)
+    doc      = fitz.open(found)
     page_idx = max(0, min(page - 1, len(doc) - 1))
-    pix = doc[page_idx].get_pixmap(matrix=fitz.Matrix(scale, scale))
+    pix      = doc[page_idx].get_pixmap(matrix=fitz.Matrix(scale, scale))
     img_bytes = pix.tobytes("png")
     doc.close()
-    return Response(
-        content=img_bytes,
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"}
-    )
+    return Response(content=img_bytes, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/snippet-image")
+def snippet_image(
+    pdf:   str   = Query(...),
+    page:  int   = Query(...),
+    text:  str   = Query(default=""),
+    scale: float = Query(2.0),
+):
+    """Return a cropped PNG of the page region containing the given text, with yellow highlight."""
+    import fitz
+    scale = max(1.0, min(3.0, scale))
+    found = find_pdf(pdf)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
+
+    doc      = fitz.open(found)
+    page_idx = max(0, min(page - 1, len(doc) - 1))
+    pg       = doc[page_idx]
+    pw, ph   = pg.rect.width, pg.rect.height
+
+    clip_rect  = None
+    found_rects = []
+
+    # Search for the snippet text on the page
+    if text and len(text.strip()) > 8:
+        search_candidates = [
+            text.strip()[:120],
+            text.strip()[:60],
+            text.strip()[:40],
+        ]
+        for candidate in search_candidates:
+            rects = pg.search_for(candidate)
+            if rects:
+                found_rects = rects
+                break
+
+    if found_rects:
+        x0 = min(r.x0 for r in found_rects)
+        y0 = min(r.y0 for r in found_rects)
+        x1 = max(r.x1 for r in found_rects)
+        y1 = max(r.y1 for r in found_rects)
+        pad_x, pad_y = 30, 55
+        clip_rect = fitz.Rect(
+            max(0,  x0 - pad_x),
+            max(0,  y0 - pad_y),
+            min(pw, x1 + pad_x),
+            min(ph, y1 + pad_y),
+        )
+    else:
+        # Fall back: show middle third of the page
+        clip_rect = fitz.Rect(0, ph * 0.25, pw, ph * 0.65)
+
+    # Add temporary yellow highlight annotations for found text
+    added_annots = []
+    for rect in found_rects:
+        try:
+            hl = pg.add_highlight_annot(rect)
+            hl.set_colors(stroke=(1.0, 0.85, 0.0))
+            hl.update()
+            added_annots.append(hl)
+        except Exception:
+            pass
+
+    pix       = pg.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip_rect)
+    img_bytes = pix.tobytes("png")
+
+    # Remove annotations so the stored PDF is not modified
+    for annot in added_annots:
+        try:
+            pg.delete_annot(annot)
+        except Exception:
+            pass
+
+    doc.close()
+    return Response(content=img_bytes, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/pdf-file")
