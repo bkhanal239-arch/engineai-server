@@ -10,3 +10,4 @@ uvicorn[standard]
 pymupdf
 numpy
 twilio
+python-telegram-bot
