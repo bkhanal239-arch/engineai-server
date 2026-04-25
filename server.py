@@ -1,6 +1,6 @@
 import os
 import time
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -269,6 +269,34 @@ def snippet_image(
     doc.close()
     return Response(content=img_bytes, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.post("/whatsapp")
+async def whatsapp_webhook(request: Request):
+    """Twilio WhatsApp webhook — receives messages and replies via Hermes agent."""
+    from twilio.twiml.messaging_response import MessagingResponse
+    from twilio.request_validator import RequestValidator
+    from whatsapp import handle_message
+
+    form_data = dict(await request.form())
+    body  = form_data.get("Body", "").strip()
+    phone = form_data.get("From", "").replace("whatsapp:", "")
+
+    # Validate Twilio signature (skip if no auth token set)
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    if auth_token:
+        validator = RequestValidator(auth_token)
+        signature = request.headers.get("X-Twilio-Signature", "")
+        url       = str(request.url)
+        if not validator.validate(url, form_data, signature):
+            raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+
+    available_pdfs = get_ingested_pdfs()
+    reply = handle_message(phone, body, available_pdfs)
+
+    resp = MessagingResponse()
+    resp.message(reply)
+    return Response(content=str(resp), media_type="application/xml")
 
 
 @app.get("/pdf-file")
