@@ -807,6 +807,7 @@
   let pdfCurrentPage = 1;
   let pdfLoadedName  = null;
   let pageObserver   = null;
+  const pageHighlights = new Map(); // pageNum → highlightText, cleared on reload
 
   // ── Mode switching ──
   function setMode(mode) {
@@ -1180,7 +1181,7 @@
         a.href = '#';
         a.textContent = `📄 p.${chunk.page}`;
         a.title = chunk.source;
-        a.addEventListener('click', e => { e.preventDefault(); scrollToPdfPage(chunk.page); });
+        a.addEventListener('click', e => { e.preventDefault(); scrollToPdfPage(chunk.page, chunk.text || ''); });
         pills.appendChild(a);
       });
       pS.appendChild(pills);
@@ -1208,6 +1209,7 @@
   async function loadPdfIntoViewer(pdfName) {
     if (pdfName === pdfLoadedName) return;
     pdfLoadedName = pdfName;
+    pageHighlights.clear(); // new doc = clear all highlights
 
     const scroll = document.getElementById('pdf-viewer-scroll');
     document.getElementById('pdf-toolbar-title').textContent = pdfName;
@@ -1277,7 +1279,10 @@
       wrapper.innerHTML = `<div style="color:#999;font-size:11px;padding:20px;text-align:center">Page ${pageNum} unavailable</div>`;
       wrapper.classList.remove('placeholder');
     };
-    img.src = `/page-image?pdf=${encodeURIComponent(name)}&page=${pageNum}&scale=${pdfScale}`;
+    // Include highlight if this page has a stored highlight
+    const hl = pageHighlights.get(pageNum);
+    const hlParam = hl ? `&highlight=${encodeURIComponent(hl.substring(0, 80))}` : '';
+    img.src = `/page-image?pdf=${encodeURIComponent(name)}&page=${pageNum}&scale=${pdfScale}${hlParam}`;
   }
 
   function setupPageObserver() {
@@ -1309,27 +1314,20 @@
     wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     if (highlightText) {
-      // Re-render page with yellow highlight on the referenced text
+      // Store highlight — persists for this session so scroll-away + return keeps it
+      pageHighlights.set(pageNum, highlightText);
+      // Force re-render with yellow highlight
       wrapper.innerHTML = '';
       wrapper.classList.add('placeholder');
-      const img = document.createElement('img');
-      img.style.cssText = 'display:block;max-width:100%;';
-      const hl = encodeURIComponent(highlightText.substring(0, 80));
-      img.src = `/page-image?pdf=${encodeURIComponent(pdfLoadedName)}&page=${pageNum}&scale=${pdfScale}&highlight=${hl}`;
-      img.onload = () => {
-        wrapper.classList.remove('placeholder');
-        wrapper.style.width  = img.naturalWidth  + 'px';
-        wrapper.style.height = img.naturalHeight + 'px';
-        const lbl = document.createElement('div');
-        lbl.className = 'pdf-page-num'; lbl.textContent = pageNum;
-        wrapper.appendChild(img);
-        wrapper.appendChild(lbl);
-      };
-      // After 3s restore normal page image
-      setTimeout(() => loadPageImage(wrapper, pageNum, pdfLoadedName), 3000);
+      wrapper.style.minHeight = '1100px';
+      const lbl = document.createElement('div');
+      lbl.className = 'pdf-page-num'; lbl.textContent = pageNum;
+      wrapper.appendChild(lbl);
+      loadPageImage(wrapper, pageNum, pdfLoadedName);
     } else {
       if (wrapper.classList.contains('placeholder')) loadPageImage(wrapper, pageNum);
     }
+    // Blue outline flash to draw attention
     wrapper.classList.add('page-highlight');
     setTimeout(() => wrapper.classList.remove('page-highlight'), 1800);
   }
