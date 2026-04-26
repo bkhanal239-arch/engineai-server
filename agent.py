@@ -191,73 +191,49 @@ def hermes_agent(question: str, pdf_name: Optional[str]) -> dict:
     init_cache()
     pdf_key = pdf_name or "ALL"
 
-    # 1. Semantic cache check — instant return if similar Q was answered before
+    # 1. Semantic cache — instant return if similar Q answered before
     hit = cache_lookup(question, pdf_key, embeddings)
     if hit:
         return hit
 
-    llm           = get_llm()
     system_prompt = load_system_prompt()
 
-    # 2. Query expansion — Hermes makes incomplete questions precise
-    try:
-        expanded = _invoke_llm(llm, [
-            SystemMessage(content=(
-                "You are a structural engineering expert. Rewrite the following question into a "
-                "complete, precise engineering code query suitable for searching standards like "
-                "ACI 318, ACI 350, ASCE 7, or IBC. "
-                "Output ONLY the rewritten question — no explanation, no quotes."
-            )),
-            HumanMessage(content=question),
-        ]).strip().strip('"').strip("'")
-        if not expanded:
-            expanded = question
-    except Exception:
-        expanded = question
+    # 2. Search ChromaDB with multiple query variants (no LLM needed)
+    #    This replaces the 3-call agentic loop with smart keyword search
+    docs, label = vector_search(question, pdf_name, embeddings, k=8)
 
-    reformulated = expanded if expanded.lower().strip() != question.lower().strip() else None
+    # Also search with a cleaned-up version (remove filler words)
+    filler = {"what", "is", "the", "are", "for", "in", "of", "a", "an", "how", "does", "do"}
+    keywords = " ".join(w for w in question.lower().split() if w not in filler)
+    if keywords and keywords != question.lower():
+        alt_docs, _ = vector_search(keywords, pdf_name, embeddings, k=4)
+        seen = {d.metadata.get("page") for d in docs}
+        for d in alt_docs:
+            if d.metadata.get("page") not in seen:
+                docs.append(d)
+                seen.add(d.metadata.get("page"))
 
-    # 3. First vector search
-    docs, label = vector_search(expanded, pdf_name, embeddings, k=8)
-    context     = fmt_docs(docs)
+    context = fmt_docs(docs)
 
-    # 4. Agentic loop — check sufficiency, re-search if needed
-    if docs:
-        try:
-            verdict = _invoke_llm(llm, [
-                SystemMessage(content=(
-                    "You are a structural engineering assistant. Does the retrieved context contain "
-                    "enough information to answer the question? Reply ONLY with 'SUFFICIENT' or 'INSUFFICIENT'."
-                )),
-                HumanMessage(content=f"Question: {expanded}\n\nContext (first 2000 chars):\n{context[:2000]}"),
-            ])
-            if "INSUFFICIENT" in verdict.upper():
-                alt_query = _invoke_llm(llm, [
-                    SystemMessage(content=(
-                        "Rephrase this engineering question using different technical terms to improve "
-                        "search results. Output ONLY the rephrased question."
-                    )),
-                    HumanMessage(content=expanded),
-                ]).strip()
-                alt_docs, _ = vector_search(alt_query, pdf_name, embeddings, k=6)
-                seen = {d.metadata.get("page") for d in docs}
-                for d in alt_docs:
-                    if d.metadata.get("page") not in seen:
-                        docs.append(d)
-                        seen.add(d.metadata.get("page"))
-                context = fmt_docs(docs)
-        except Exception:
-            pass  # proceed with original results
-
-    # 5. Generate structured answer
+    # 3. Single LLM call — Hermes expands + answers in one shot
+    #    System prompt already instructs it to interpret vague questions
     prompt = (
         system_prompt
         + "\n\n---\nRETRIEVED CONTEXT:\n" + context
-        + "\n\n---\nUSER QUESTION:\n" + expanded
+        + "\n\n---\nUSER QUESTION:\n" + question
+        + "\n\nIMPORTANT: If the question is vague or incomplete, first state what you "
+        + "interpreted it as (per Rule 8), then answer fully from the retrieved context."
         + "\n\nRespond using the exact format specified above."
     )
+    llm    = get_llm()
     raw    = _invoke_llm(llm, [HumanMessage(content=prompt)])
     parsed = parse_response(raw)
+
+    # Extract reformulated query from the answer's "Interpreted as:" line
+    reformulated = None
+    interp_match = re.search(r"\*Interpreted as:\s*(.+?)\.\*", parsed["answer"])
+    if interp_match:
+        reformulated = interp_match.group(1).strip()
 
     raw_chunks = [
         {
@@ -273,7 +249,7 @@ def hermes_agent(question: str, pdf_name: Optional[str]) -> dict:
         "code_ref":     parsed["code_ref"],
         "snippet":      parsed["snippet"],
         "raw_chunks":   raw_chunks,
-        "reformulated": reformulated,
+        "reformulated": reformulated,   # extracted from "Interpreted as:" in answer
         "from_cache":   False,
         "searched":     label,
     }
