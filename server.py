@@ -64,25 +64,27 @@ def ask(request: AskRequest):
             from agent import hermes_agent
             result = hermes_agent(request.question, request.pdf_name)
             return {
-                "answer":       result.get("answer", ""),
-                "code_ref":     result.get("code_ref", ""),
-                "snippet":      result.get("snippet", ""),
-                "searched":     result.get("searched", ""),
-                "query":        request.question,
-                "reformulated": result.get("reformulated"),
-                "raw_chunks":   result.get("raw_chunks", []),
-                "from_cache":   result.get("from_cache", False),
+                "answer":           result.get("answer", ""),
+                "code_ref":         result.get("code_ref", ""),
+                "snippet":          result.get("snippet", ""),
+                "searched":         result.get("searched", ""),
+                "query":            request.question,
+                "reformulated":     result.get("reformulated"),
+                "raw_chunks":       result.get("raw_chunks", []),
+                "from_cache":       result.get("from_cache", False),
                 "cache_similarity": result.get("cache_similarity"),
+                "engine":           "hermes",
             }
         except Exception as e:
             msg = str(e)
-            if "503" in msg or "UNAVAILABLE" in msg or "overloaded" in msg.lower():
-                raise HTTPException(status_code=503, detail="Hermes is temporarily unavailable. Please try again.")
-            if "429" in msg or "rate" in msg.lower():
-                raise HTTPException(status_code=429, detail="Rate limit reached. Please wait a moment.")
-            raise HTTPException(status_code=500, detail=msg)
+            # On rate limit or unavailable → silently fall back to Gemini
+            is_rate   = "429" in msg or "rate" in msg.lower()
+            is_unavail = "503" in msg or "UNAVAILABLE" in msg or "overloaded" in msg.lower()
+            if not (is_rate or is_unavail):
+                raise HTTPException(status_code=500, detail=msg)
+            # Fall through to Gemini below
 
-    # ── Gemini fallback path ──────────────────────────────────────
+    # ── Gemini path (primary when Hermes off, fallback when rate-limited) ──
     expanded     = expand_query(request.question)
     reformulated = expanded if expanded.lower() != request.question.lower().strip() else None
     chain, retriever, label = build_chain(request.pdf_name)
@@ -120,6 +122,7 @@ def ask(request: AskRequest):
             "reformulated": reformulated,
             "raw_chunks":   raw_snips,
             "from_cache":   False,
+            "engine":       "gemini",
         }
     except Exception as e:
         msg = str(e)

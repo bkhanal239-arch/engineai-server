@@ -1100,14 +1100,20 @@
     const card = document.createElement('div');
     card.className = 'response-card';
 
-    // Cache hit badge
+    // Engine + cache badge
+    const badge = document.createElement('div');
+    badge.className = 'cache-badge';
     if (data.from_cache) {
-      const badge = document.createElement('div');
-      badge.className = 'cache-badge';
       const pct = data.cache_similarity ? Math.round(data.cache_similarity * 100) : '';
       badge.innerHTML = `⚡ Instant recall from cache${pct ? ' (' + pct + '% match)' : ''}`;
-      card.appendChild(badge);
+    } else if (data.engine === 'gemini') {
+      badge.style.cssText = 'background:linear-gradient(90deg,#e8f4fd,#f0e8fd);border-color:#a8c5e8;color:#1a5276;';
+      badge.innerHTML = '✦ Answered by Gemini 2.5 Flash';
+    } else {
+      badge.style.cssText = 'background:linear-gradient(90deg,#f0faf0,#e8f5e9);border-color:#a5d6a7;color:#1b5e20;';
+      badge.innerHTML = '🤖 Answered by Hermes 3 (405B)';
     }
+    card.appendChild(badge);
 
     // Reformulated query banner (only shown when question was expanded)
     if (data.reformulated) {
