@@ -22,7 +22,7 @@ CACHE_DB    = os.path.join(os.path.dirname(__file__), "answer_cache.db")
 PROMPT_PATH = os.path.join(os.path.dirname(__file__), "prompt_template.md")
 
 EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
-HERMES_MODEL     = os.environ.get("HERMES_MODEL", "nousresearch/hermes-3-llama-3.1-405b:free")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
 CACHE_THRESHOLD  = float(os.environ.get("CACHE_THRESHOLD", "0.92"))
 
 
@@ -42,7 +42,7 @@ def get_embeddings():
 
 def get_llm():
     return ChatOpenAI(
-        model=HERMES_MODEL,
+        model=OPENROUTER_MODEL,
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ.get("OPENROUTER_API_KEY", ""),
         temperature=0,
@@ -215,18 +215,17 @@ def hermes_agent(question: str, pdf_name: Optional[str]) -> dict:
 
     context = fmt_docs(docs)
 
-    # 3. Single LLM call — Hermes expands + answers in one shot
-    #    System prompt already instructs it to interpret vague questions
-    prompt = (
-        system_prompt
-        + "\n\n---\nRETRIEVED CONTEXT:\n" + context
-        + "\n\n---\nUSER QUESTION:\n" + question
-        + "\n\nIMPORTANT: If the question is vague or incomplete, first state what you "
-        + "interpreted it as (per Rule 8), then answer fully from the retrieved context."
-        + "\n\nRespond using the exact format specified above."
-    )
-    llm    = get_llm()
-    raw    = _invoke_llm(llm, [HumanMessage(content=prompt)])
+    # 3. Single LLM call — system/user split so Llama follows the strict rules properly
+    llm = get_llm()
+    raw = _invoke_llm(llm, [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=(
+            "RETRIEVED CONTEXT:\n" + context
+            + "\n\n---\nUSER QUESTION:\n" + question
+            + "\n\nRespond using the exact format: **Answer:** / **Code Reference:** / **Exact Snippet:**"
+            + "\nAlways start the Answer with *Interpreted as: ...*  Never truncate values or lists."
+        )),
+    ])
     parsed = parse_response(raw)
 
     # Extract reformulated query from the answer's "Interpreted as:" line

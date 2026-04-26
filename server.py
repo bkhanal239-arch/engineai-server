@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
@@ -73,13 +74,14 @@ def ask(request: AskRequest):
                 "raw_chunks":       result.get("raw_chunks", []),
                 "from_cache":       result.get("from_cache", False),
                 "cache_similarity": result.get("cache_similarity"),
-                "engine":           "hermes",
+                "engine":           "openrouter",
+                "model":            os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct").split("/")[-1],
             }
         except Exception as e:
             msg = str(e)
             # On rate limit or unavailable → silently fall back to Gemini
-            is_rate   = "429" in msg or "rate" in msg.lower()
-            is_unavail = "503" in msg or "UNAVAILABLE" in msg or "overloaded" in msg.lower()
+            is_rate   = "429" in msg or "rate" in msg.lower() or "rate_limit" in msg.lower()
+            is_unavail = "503" in msg or "502" in msg or "UNAVAILABLE" in msg or "overloaded" in msg.lower()
             if not (is_rate or is_unavail):
                 raise HTTPException(status_code=500, detail=msg)
             # Fall through to Gemini below
@@ -169,6 +171,39 @@ def find_pdf(name: str) -> str | None:
     return None
 
 
+def _find_highlight_rects(pg, highlight: str):
+    """Return list of fitz.Rect to highlight on the page. Empty list = nothing found."""
+    import fitz
+    clean = re.sub(r'\s+', ' ', highlight.strip())
+
+    # Stage 1: exact phrase, progressively shortened
+    for length in [90, 60, 35]:
+        rects = pg.search_for(clean[:length])
+        if rects:
+            return rects
+
+    # Stage 2: block-level match — find the text block (paragraph) with most matching words
+    # Returns a single rect around the best matching paragraph, not scattered word rects
+    search_words = {w.lower().rstrip('.,;:()') for w in re.split(r'\W+', clean) if len(w) >= 4}
+    if not search_words:
+        return []
+
+    blocks = pg.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
+    best_score, best_rect = 0, None
+    for block in blocks:
+        if len(block) < 6 or block[6] != 0:  # skip images / non-text
+            continue
+        block_text = block[4].lower()
+        score = sum(1 for w in search_words if w in block_text)
+        if score > best_score:
+            best_score = score
+            best_rect = fitz.Rect(block[0], block[1], block[2], block[3])
+
+    if best_score >= 2 and best_rect:
+        return [best_rect]
+    return []
+
+
 @app.get("/page-count")
 def page_count(pdf: str = Query(...)):
     import fitz
@@ -199,15 +234,13 @@ def page_image(
 
     # Draw yellow highlight on matching text if requested
     if highlight and len(highlight.strip()) > 6:
-        for length in [80, 50, 30]:
-            rects = pg.search_for(highlight.strip()[:length])
-            if rects:
-                shape = pg.new_shape()
-                for rect in rects:
-                    shape.draw_rect(rect)
-                shape.finish(color=None, fill=(1, 0.93, 0), fill_opacity=0.5)
-                shape.commit()
-                break
+        rects = _find_highlight_rects(pg, highlight)
+        if rects:
+            shape = pg.new_shape()
+            for rect in rects:
+                shape.draw_rect(rect)
+            shape.finish(color=None, fill=(1, 0.93, 0), fill_opacity=0.75)
+            shape.commit()
 
     pix       = pg.get_pixmap(matrix=fitz.Matrix(scale, scale))
     img_bytes = pix.tobytes("png")

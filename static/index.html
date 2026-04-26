@@ -651,6 +651,10 @@
       outline-offset: 2px;
     }
 
+    .pdf-loading {
+      color: #aaa; font-size: 12px; padding: 40px 20px; text-align: center;
+    }
+
     .pdf-empty-state {
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
@@ -1123,7 +1127,7 @@
       badge.innerHTML = '✦ Answered by Gemini 2.5 Flash';
     } else {
       badge.style.cssText = 'background:linear-gradient(90deg,#f0faf0,#e8f5e9);border-color:#a5d6a7;color:#1b5e20;';
-      badge.innerHTML = '🤖 Answered by Hermes 3 (405B)';
+      badge.innerHTML = '🤖 Answered by OpenRouter · ' + (data.model || 'Llama 3.3 70B');
     }
     card.appendChild(badge);
 
@@ -1143,8 +1147,7 @@
 
     // Code Reference — clickable jump button
     if (data.code_ref) {
-      const pageMatch = data.code_ref.match(/[Pp]age\s*(\d+)/);
-      const refPage   = pageMatch ? parseInt(pageMatch[1]) : (data.raw_chunks?.[0]?.page);
+      const refPage = data.raw_chunks?.[0]?.page;
       const rS = document.createElement('div'); rS.className = 'resp-section';
       rS.innerHTML = `<div class="resp-lbl ref">📌 Code Reference</div>`;
       const refBtn = document.createElement('div');
@@ -1316,13 +1319,10 @@
     if (highlightText) {
       // Store highlight — persists for this session so scroll-away + return keeps it
       pageHighlights.set(pageNum, highlightText);
-      // Force re-render with yellow highlight
-      wrapper.innerHTML = '';
+      // Force re-render with yellow highlight — show spinner while image loads
+      wrapper.innerHTML = '<div class="pdf-loading">⏳ Loading…</div>';
       wrapper.classList.add('placeholder');
       wrapper.style.minHeight = '1100px';
-      const lbl = document.createElement('div');
-      lbl.className = 'pdf-page-num'; lbl.textContent = pageNum;
-      wrapper.appendChild(lbl);
       loadPageImage(wrapper, pageNum, pdfLoadedName);
     } else {
       if (wrapper.classList.contains('placeholder')) loadPageImage(wrapper, pageNum);
