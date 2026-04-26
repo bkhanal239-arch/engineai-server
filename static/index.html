@@ -446,6 +446,17 @@
     .rq-label { font-weight: 600; color: #7d5200; white-space: nowrap; flex-shrink: 0; }
     .rq-text  { color: #1a1a1a; font-style: italic; line-height: 1.4; }
 
+    /* Clickable code reference jump button */
+    .ref-clickable {
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ref-clickable:hover {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+    }
+
     /* Page reference pills */
     .page-ref-link {
       display: inline-flex; align-items: center; gap: 3px;
@@ -1129,10 +1140,20 @@
     aS.innerHTML = `<div class="resp-lbl answer">✅ Answer</div><div class="resp-body">${ansHtml}</div>`;
     card.appendChild(aS);
 
-    // Code Reference
+    // Code Reference — clickable jump button
     if (data.code_ref) {
+      const pageMatch = data.code_ref.match(/[Pp]age\s*(\d+)/);
+      const refPage   = pageMatch ? parseInt(pageMatch[1]) : (data.raw_chunks?.[0]?.page);
       const rS = document.createElement('div'); rS.className = 'resp-section';
-      rS.innerHTML = `<div class="resp-lbl ref">📌 Code Reference</div><div class="ref-body">${esc(data.code_ref)}</div>`;
+      rS.innerHTML = `<div class="resp-lbl ref">📌 Code Reference</div>`;
+      const refBtn = document.createElement('div');
+      refBtn.className = 'ref-body ref-jump' + (refPage ? ' ref-clickable' : '');
+      refBtn.innerHTML = (refPage ? '🔗 ' : '') + esc(data.code_ref);
+      if (refPage) {
+        refBtn.title = 'Click to jump to this section in the PDF viewer';
+        refBtn.addEventListener('click', () => scrollToPdfPage(refPage, data.snippet || ''));
+      }
+      rS.appendChild(refBtn);
       card.appendChild(rS);
     }
 
@@ -1141,38 +1162,6 @@
       const sS = document.createElement('div'); sS.className = 'resp-section';
       sS.innerHTML = `<div class="resp-lbl snip">📄 Exact Snippet</div><div class="snip-body">${esc(data.snippet)}</div>`;
       card.appendChild(sS);
-    }
-
-    // PDF Snippet Image — cropped page with yellow highlight on the found text
-    if (data.snippet && pdfLoadedName) {
-      // Extract page number from code_ref (e.g. "Page 114") or first chunk
-      let snippetPage = null;
-      if (data.code_ref) {
-        const m = data.code_ref.match(/[Pp]age\s*(\d+)/);
-        if (m) snippetPage = parseInt(m[1]);
-      }
-      if (!snippetPage && data.raw_chunks?.length) snippetPage = data.raw_chunks[0].page;
-
-      if (snippetPage) {
-        const imgWrap = document.createElement('div');
-        imgWrap.className = 'resp-section';
-        imgWrap.innerHTML = '<div class="resp-lbl snip">🔍 In Document</div>';
-        const inner = document.createElement('div');
-        inner.className = 'snippet-img-wrap';
-        const lbl = document.createElement('div');
-        lbl.className = 'snippet-img-label';
-        lbl.textContent = `📐 Page ${snippetPage} — click to navigate`;
-        const img = document.createElement('img');
-        img.alt = `Page ${snippetPage} snippet`;
-        img.title = 'Click to go to this page in the PDF viewer';
-        const textParam = data.snippet ? '&text=' + encodeURIComponent(data.snippet.substring(0, 120)) : '';
-        img.src = `/snippet-image?pdf=${encodeURIComponent(pdfLoadedName)}&page=${snippetPage}&scale=2.0${textParam}`;
-        img.addEventListener('click', () => scrollToPdfPage(snippetPage));
-        inner.appendChild(lbl);
-        inner.appendChild(img);
-        imgWrap.appendChild(inner);
-        card.appendChild(imgWrap);
-      }
     }
 
     // Pages Referenced — clickable pills
@@ -1311,14 +1300,36 @@
     scroll.querySelectorAll('.pdf-page-wrapper').forEach(w => pageObserver.observe(w));
   }
 
-  function scrollToPdfPage(pageNum) {
+  function scrollToPdfPage(pageNum, highlightText) {
     if (!pdfLoadedName) return;
     if (currentMode === 'chat') setMode('split');
     const scroll  = document.getElementById('pdf-viewer-scroll');
     const wrapper = scroll.querySelector(`.pdf-page-wrapper[data-page="${pageNum}"]`);
     if (!wrapper) return;
     wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (wrapper.classList.contains('placeholder')) loadPageImage(wrapper, pageNum);
+
+    if (highlightText) {
+      // Re-render page with yellow highlight on the referenced text
+      wrapper.innerHTML = '';
+      wrapper.classList.add('placeholder');
+      const img = document.createElement('img');
+      img.style.cssText = 'display:block;max-width:100%;';
+      const hl = encodeURIComponent(highlightText.substring(0, 80));
+      img.src = `/page-image?pdf=${encodeURIComponent(pdfLoadedName)}&page=${pageNum}&scale=${pdfScale}&highlight=${hl}`;
+      img.onload = () => {
+        wrapper.classList.remove('placeholder');
+        wrapper.style.width  = img.naturalWidth  + 'px';
+        wrapper.style.height = img.naturalHeight + 'px';
+        const lbl = document.createElement('div');
+        lbl.className = 'pdf-page-num'; lbl.textContent = pageNum;
+        wrapper.appendChild(img);
+        wrapper.appendChild(lbl);
+      };
+      // After 3s restore normal page image
+      setTimeout(() => loadPageImage(wrapper, pageNum, pdfLoadedName), 3000);
+    } else {
+      if (wrapper.classList.contains('placeholder')) loadPageImage(wrapper, pageNum);
+    }
     wrapper.classList.add('page-highlight');
     setTimeout(() => wrapper.classList.remove('page-highlight'), 1800);
   }

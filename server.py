@@ -182,7 +182,12 @@ def page_count(pdf: str = Query(...)):
 
 
 @app.get("/page-image")
-def page_image(pdf: str = Query(...), page: int = Query(...), scale: float = Query(1.5)):
+def page_image(
+    pdf:       str   = Query(...),
+    page:      int   = Query(...),
+    scale:     float = Query(1.5),
+    highlight: str   = Query(default=""),
+):
     import fitz
     scale = max(0.5, min(3.0, scale))
     found = find_pdf(pdf)
@@ -190,11 +195,27 @@ def page_image(pdf: str = Query(...), page: int = Query(...), scale: float = Que
         raise HTTPException(status_code=404, detail=f"PDF not found: {pdf}")
     doc      = fitz.open(found)
     page_idx = max(0, min(page - 1, len(doc) - 1))
-    pix      = doc[page_idx].get_pixmap(matrix=fitz.Matrix(scale, scale))
+    pg       = doc[page_idx]
+
+    # Draw yellow highlight on matching text if requested
+    if highlight and len(highlight.strip()) > 6:
+        for length in [80, 50, 30]:
+            rects = pg.search_for(highlight.strip()[:length])
+            if rects:
+                shape = pg.new_shape()
+                for rect in rects:
+                    shape.draw_rect(rect)
+                shape.finish(color=None, fill=(1, 0.93, 0), fill_opacity=0.5)
+                shape.commit()
+                break
+
+    pix       = pg.get_pixmap(matrix=fitz.Matrix(scale, scale))
     img_bytes = pix.tobytes("png")
     doc.close()
+    # No cache when highlighted so normal page isn't cached as highlighted
+    cache = "no-store" if highlight else "public, max-age=3600"
     return Response(content=img_bytes, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=3600"})
+                    headers={"Cache-Control": cache})
 
 
 @app.get("/snippet-image")
