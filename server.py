@@ -257,7 +257,7 @@ def snippet_image(
             pass
 
     pix       = pg.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip_rect)
-    img_bytes = pix.tobytes("png")
+    img_bytes = pix.tobytes("jpeg", jpg_quality=92)
 
     # Remove annotations so the stored PDF is not modified
     for annot in added_annots:
@@ -267,7 +267,7 @@ def snippet_image(
             pass
 
     doc.close()
-    return Response(content=img_bytes, media_type="image/png",
+    return Response(content=img_bytes, media_type="image/jpeg",
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
