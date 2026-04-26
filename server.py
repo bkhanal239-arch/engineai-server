@@ -204,7 +204,7 @@ def snippet_image(
     text:  str   = Query(default=""),
     scale: float = Query(2.0),
 ):
-    """Return a cropped PNG of the page region containing the given text, with yellow highlight."""
+    """Crop the PDF page to the region containing the snippet text and return as PNG."""
     import fitz
     scale = max(1.0, min(3.0, scale))
     found = find_pdf(pdf)
@@ -216,61 +216,47 @@ def snippet_image(
     pg       = doc[page_idx]
     pw, ph   = pg.rect.width, pg.rect.height
 
-    clip_rect  = None
+    # Search for the snippet text — try progressively shorter candidates
     found_rects = []
-
-    # Search for the snippet text on the page
     if text and len(text.strip()) > 8:
-        search_candidates = [
-            text.strip()[:120],
-            text.strip()[:60],
-            text.strip()[:40],
-        ]
-        for candidate in search_candidates:
+        for length in [100, 60, 35]:
+            candidate = text.strip()[:length]
             rects = pg.search_for(candidate)
             if rects:
                 found_rects = rects
                 break
 
+    # Build clip rectangle around found text (with generous padding)
     if found_rects:
         x0 = min(r.x0 for r in found_rects)
         y0 = min(r.y0 for r in found_rects)
         x1 = max(r.x1 for r in found_rects)
         y1 = max(r.y1 for r in found_rects)
-        pad_x, pad_y = 30, 55
         clip_rect = fitz.Rect(
-            max(0,  x0 - pad_x),
-            max(0,  y0 - pad_y),
-            min(pw, x1 + pad_x),
-            min(ph, y1 + pad_y),
+            max(0,  x0 - 35),
+            max(0,  y0 - 70),
+            min(pw, x1 + 35),
+            min(ph, y1 + 70),
         )
     else:
-        # Fall back: show middle third of the page
-        clip_rect = fitz.Rect(0, ph * 0.25, pw, ph * 0.65)
+        # Text not found — show upper-middle portion of the page
+        clip_rect = fitz.Rect(0, ph * 0.2, pw, ph * 0.6)
 
-    # Add temporary yellow highlight annotations for found text
-    added_annots = []
-    for rect in found_rects:
-        try:
-            hl = pg.add_highlight_annot(rect)
-            hl.set_colors(stroke=(1.0, 0.85, 0.0))
-            hl.update()
-            added_annots.append(hl)
-        except Exception:
-            pass
+    # Draw yellow highlight rectangle directly on a separate drawing layer
+    # (avoids annotation API issues across PyMuPDF versions)
+    if found_rects:
+        shape = pg.new_shape()
+        for rect in found_rects:
+            shape.draw_rect(rect)
+        shape.finish(color=None, fill=(1, 0.95, 0), fill_opacity=0.4)
+        shape.commit()
 
+    # Render cropped region as PNG (reliable across all PyMuPDF versions)
     pix       = pg.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip_rect)
-    img_bytes = pix.tobytes("jpeg", jpg_quality=92)
-
-    # Remove annotations so the stored PDF is not modified
-    for annot in added_annots:
-        try:
-            pg.delete_annot(annot)
-        except Exception:
-            pass
-
+    img_bytes = pix.tobytes("png")
     doc.close()
-    return Response(content=img_bytes, media_type="image/jpeg",
+
+    return Response(content=img_bytes, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
