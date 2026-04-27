@@ -1284,7 +1284,7 @@
     };
     // Include highlight if this page has a stored highlight
     const hl = pageHighlights.get(pageNum);
-    const hlParam = hl ? `&highlight=${encodeURIComponent(hl.substring(0, 80))}` : '';
+    const hlParam = hl ? `&highlight=${encodeURIComponent(hl.substring(0, 250))}` : '';
     img.src = `/page-image?pdf=${encodeURIComponent(name)}&page=${pageNum}&scale=${pdfScale}${hlParam}`;
   }
 

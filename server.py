@@ -172,36 +172,43 @@ def find_pdf(name: str) -> str | None:
 
 
 def _find_highlight_rects(pg, highlight: str):
-    """Return list of fitz.Rect to highlight on the page. Empty list = nothing found."""
+    """Return rects to highlight. Always returns something — falls back to page center band."""
     import fitz
+    pw, ph = pg.rect.width, pg.rect.height
     clean = re.sub(r'\s+', ' ', highlight.strip())
 
     # Stage 1: exact phrase, progressively shortened
-    for length in [90, 60, 35]:
+    for length in [90, 60, 35, 20]:
         rects = pg.search_for(clean[:length])
         if rects:
             return rects
 
-    # Stage 2: block-level match — find the text block (paragraph) with most matching words
-    # Returns a single rect around the best matching paragraph, not scattered word rects
-    search_words = {w.lower().rstrip('.,;:()') for w in re.split(r'\W+', clean) if len(w) >= 4}
-    if not search_words:
-        return []
-
-    blocks = pg.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
+    # Stage 2: block-level match — find paragraph with most matching words
+    search_words = {w.lower().rstrip('.,;:()') for w in re.split(r'\W+', clean) if len(w) >= 3}
     best_score, best_rect = 0, None
-    for block in blocks:
-        if len(block) < 6 or block[6] != 0:  # skip images / non-text
-            continue
-        block_text = block[4].lower()
-        score = sum(1 for w in search_words if w in block_text)
-        if score > best_score:
-            best_score = score
-            best_rect = fitz.Rect(block[0], block[1], block[2], block[3])
+    largest_area, fallback_rect = 0, None
 
-    if best_score >= 2 and best_rect:
+    for block in pg.get_text("blocks"):
+        if len(block) < 6 or block[6] != 0:  # skip image blocks
+            continue
+        rect = fitz.Rect(block[0], block[1], block[2], block[3])
+        if search_words:
+            score = sum(1 for w in search_words if w in block[4].lower())
+            if score > best_score:
+                best_score, best_rect = score, rect
+        area = (block[2] - block[0]) * (block[3] - block[1])
+        if area > largest_area:
+            largest_area, fallback_rect = area, rect
+
+    if best_score >= 1 and best_rect:
         return [best_rect]
-    return []
+
+    # Stage 3: largest text block on the page (catches poor-match cases)
+    if fallback_rect:
+        return [fallback_rect]
+
+    # Stage 4: scanned / image-only PDF — highlight center band so user sees something
+    return [fitz.Rect(0, ph * 0.28, pw, ph * 0.55)]
 
 
 @app.get("/page-count")
